@@ -265,6 +265,13 @@ avoiding encapsulated function calls.
 
 *** Chromatographic peak detection
 
++ Aim: identify chromatographic peaks in the data.
++ Different methods available:
+
+*** Alignment
+
+*** Correspondence
+
 ** Conclusion
 
 
