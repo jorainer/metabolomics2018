@@ -266,11 +266,24 @@ avoiding encapsulated function calls.
 *** Chromatographic peak detection
 
 + Aim: identify chromatographic peaks in the data.
-+ Different methods available:
++ Function: =findChromPeaks=.
++ Methods available:
+  - /matchedFilter/ (=MatchedFilterParam=).
+  - /centWave/ (=CentWaveParam=).
+  - /massifquant/ (=MassifquantParam=).
 
 *** Alignment
 
++ Aim: adjusts shifts in retention times between samples.
++ Function: =adjustRtime=.
++ Methods available:
+
+
 *** Correspondence
+
++ Aim: group signal from the same ion across samples.
++ Function: =groupChromPeaks=.
++ Methods available:
 
 ** Conclusion
 
