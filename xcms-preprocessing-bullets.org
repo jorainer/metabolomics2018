@@ -1,0 +1,366 @@
+#+TITLE: Metabolomics data pre-processing using xcms
+#+AUTHOR: Johannes Rainer
+#+EMAIL: johannes.rainer@eurac.edu
+#+OPTIONS: ^:{} toc:nil
+#+PROPERTY: header-args:R :exports code
+#+PROPERTY: header-args:R :results silent
+#+PROPERTY: header-args:R :session *Rmetabo*
+#+STARTUP: overview
+
+#+BEGIN_EXPORT html
+---
+title: "Metabolomics data pre-processing using xcms"
+author: "Johannes Rainer (johannes.rainer@eurac.edu)"
+graphics: yes
+date: "`r doc_date()`"
+output:
+  BiocStyle::html_document:
+    number_sections: true
+    toc_float: true
+    toc_depth: 2
+bibliography: references.bib
+references:
+- id: dummy
+  title: no title
+  author:
+  - family: noname
+    given: noname
+---
+
+<!-- 
+NOTE: this document should not be edited manually, as it will be over-written
+by exporting the metabolomics-preprocessing.org file.
+-->
+#+END_EXPORT
+
+** Background
+
++ =xcms= a relatively /old/ package for untargeted, LC/GC-MS data preprocessing.
++ Major changes in =xcms= version > 3:
+  - re-use data structures from Bioconductor's =MSnbase= package.
+  - native MSn support.
+  - New functions.
+  - Internal changes and code cleanup.
+
+*** Definitions and common naming convention
+
++ chromatographic peak: peak containing the signal from an ion in retention time
+  dimension.
++ chromatographic peak detection: process in which chromatographic peaks are
+  identified within each file.
++ alignment: process that adjusts for retention time differences between files.
++ correspondence: grouping of chromatographic peaks (presumably from the same
+  ion) across files.
++ feature: chromatographic peaks grouped across files.
+
+** Workflow: metabolomics data preprocessing using =xcms=
+
+The workflow is focused on the *new* =xcms= interface/functions and describes:
++ Basic MS data handling (=MSnbase=).
++ Simple MS data centroiding (=MSnbase=).
++ LC-MS data pre-processing (=xcms=):
+  - chromatographic peak detection
+  - alignment
+  - correspondence
++ Not covered:
+  - data normalization
+  - compound identification
+  - differential abundance analysis
+
+*** Prerequisites
+
++ Rstudio
++ R version >= 3.5.0
++ Libraries:
+#+BEGIN_SRC R :ravel eval = FALSE, results = "hide"
+  source("https://bioconductor.org/biocLite.R")
+  biocLite(c("xcms", "MSnbase", "doParallel", "rgl", "msdata", "magrittr",
+	     "devtools"))
+  ## Need xcms version > 3.3.1
+  if (packageVersion("xcms") < "3.3.1")
+      devtools::install_github("sneumann/xcms", ref = "master")
+#+END_SRC
+
+*** Data import and representation
+
++ MS data can be loaded with the =readMSData= function.
++ =mode = "onDisk"= does read only header information from the files, actual m/z
+  and intensity values are retrieved on demand.
++ /on-disk/ mode enables analysis of very large experiments.
++ Interactive code: read the toy data set.
+
+#+NAME: load-data
+#+BEGIN_SRC R :ravel message = FALSE
+  library(MSnbase)
+  library(xcms)
+  library(doParallel)
+  library(magrittr)
+
+  ## Define the file names.
+  fls <- dir(system.file("sciex", package = "msdata"), full.names = TRUE)
+
+  ## Define a data.frame with additional information on the files.
+  pd <- data.frame(file = basename(fls),
+		   injection_idx = c(1, 19),
+		   sample = "POOL")
+  data <- readMSData(fls, pdata = new("NAnnotatedDataFrame", pd), mode = "onDisk")
+#+END_SRC
+
++ Parallel processing setup should be defined at the start.
++ Most functions from =xcms= and =MSnbase= are parallelized /per-file/ and use the
+  registered setup.
++ Interactive code: parallel setup
+
+#+NAME: parallel-setup
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Set up parallel processing using 3 cores
+  registerDoParallel(3)
+  register(bpstart(DoparParam()), default = TRUE)
+#+END_SRC
+
++ Data is an =OnDiskMSnExp=; access phenotype information using =pData= or =$=,
+  general spectrum information using =fData=.
++ Interactive code: get to know the =OnDiskMSnExp= object. 
+
+#+NAME: show-fData
+#+BEGIN_SRC R :ravel message = FALSE
+  data
+
+  ## Access phenotype information
+  pData(data)
+
+  ## Or individual columns directly using the $ operator
+  data$injection_idx
+
+  ## Access spectrum header information
+  head(fData(data))
+#+END_SRC
+
++ Note: with the data not being in memory, any data manipulation (such as
+  smoothing) is never /applied/ to the data but is performed on-the-fly.
+
+*** Basic data access and visualization
+
++ MS data in an =OnDiskMSnExp= object is organized by spectrum (similarly to mzML
+  files).
++ Access general spectrum information with =msLevel=, =centroided=, =rtime=, =polarity=.
++ Use =fromFile= to know which values belong to which file/sample.
++ =Spectrum= object: container for m/z and intensity values.
++ Interactive code: access general spectrum information.
+
+#+NAME: general-access
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Get the retention time
+  head(rtime(data))
+
+  ## How many spectra are there?
+  length(rtime(data))
+
+  ## Get the retention times splitted by file.
+  rts <- split(rtime(data), fromFile(data))
+
+  ## The result is a list of length 2. The number of spectra per file can
+  ## then be determined with
+  lengths(rts)
+#+END_SRC
+
++ =spectra= gets the list of all spectra (from all files). This loads the full
+  data from all files!
++ In most cases we work with subsets anyway: use filter functions to subset the
+  data:
+  - =filterFile= subset to individual files/samples.
+  - =filterRtime= restrict to specific retention time window.
+  - =filterMz= restrict to m/z range.
+  - =filterMsLevel= subset to certain MS level(s).
++ Data access will be fast on indexed mzML, mzXML and CDF files.
++ Interactive: extract all spectra measured between 180 and 181 seconds.
+
+#+NAME: spectra-filterRt
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Get all spectra measured between 180 and 181 seconds 
+  sps <- spectra(filterRt(data, rt = c(180, 181)))
+
+  ## How many spectra?
+  length(sps)
+
+  ## From which file?
+  lapply(sps, fromFile)
+
+#+END_SRC
+
++ Example: plot the data from the last spectrum
+
+#+NAME: spectrum-plot
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Spectrum at a retention time of about 180 seconds."
+  plot(sps[[6]])
+#+END_SRC
+
++ Spectra represent intensities along the m/z dimension for discrete retention
+  times.
++ =chromatogram= function retrieves chromatographic data (intensities along the
+  retention time axis for a certain m/z range).
++ Interactive code: get the total ion chromatogram for each file.
+
+#+NAME: chromatogram
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Total ion chromatogram."
+  ## Get chromatographic data (TIC) for an m/z slice
+  chr <- chromatogram(data)
+  chr
+
+  ## Plot the tic
+  plot(chr)
+#+END_SRC
+
++ We have one chromatogram per file.
++ =aggregationFun= parameter allows to switch from TIC ="sum"= to BPC ="max"=.
++ Interactive code: get chromatographic data for Serine ([M+H]+ adduct m/z
+  106.0455 matches the second largest peak in spectrum above).
+
+#+NAME: serine-xic
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Extracted ion chromatogram for the Serine [M+H]+ ion."
+  ## Using %>% to better show the workflow of data extraction
+  data %>%
+      filterRt(rt = c(175, 189)) %>%
+      filterMz(mz = c(106.02, 106.07)) %>%
+      chromatogram() %>%
+      plot()
+
+#+END_SRC 
+
++ =spectra= to get intensities along m/z for discrete retention time.
++ =chromatogram= to get intensities along rt for m/z range. 
++ Use =rtime=, =mz=, =intensity= to access the values.
+
+*** Centroiding of profile MS data
+
++ /centroiding/ is the process in which mass peaks are reduced to a single,
+  representative signal, their centroids.
++ =xcms=, specifically /centWave/ was designed for centroided data.
++ Proper centroiding can improve data accuracy.
++ =MSnase= provides basic tools to perform MS data smoothing and centroiding:
+  =smooth= and =pickPeaks=.
++ Interactive code: show the profile mode data for Serine.
+
+#+NAME: serine-profile-mode-data
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Profile data for Serine."
+  ## Filter the MS data to the signal from the Serine ion and plot it using
+  ## type = "XIC"
+  data %>%
+      filterRt(rt = c(175, 189)) %>%
+      filterMz(mz = c(106.02, 106.07)) %>%
+      plot(type = "XIC")
+#+END_SRC
+
++ Interactive code: smooth data in m/z dimension using a Savitzky-Golay filter
+  followed by a centroiding that simply reports the maximum signal for each mass
+  peak in each spectrum. See =?pickPeaks= for more advanced options.
+
+#+NAME: centroiding
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Centroided data for Serine."
+  ## Smooth the signal, then do a simple peak picking.
+  data_cent <- data %>%
+      smooth(method = "SavitzkyGolay", halfWindowSize = 6) %>%
+      pickPeaks()
+
+  ## Plot the centroided data for Serine
+  data_cent %>%
+      filterRt(rt = c(175, 189)) %>%
+      filterMz(mz = c(106.02, 106.07)) %>%
+      plot(type = "XIC")
+#+END_SRC
+
++ Note: data smoothing and centroiding is applied to the data /on-the-fly/, each
+  time m/z or intensity values are accessed. To make the centroiding /persistent/
+  we need to export the centroided data.
++ Interactive code: export the smoothed data to new files and re-read the data.
+
+#+NAME: export-centroided
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Write the centroided data to files with the same names in the current
+  ## directory
+  fls_new <- basename(fileNames(data))
+  writeMSData(data_cent, file = fls_new)
+
+  ## Read the centroided data.
+  data_cent <- readMSData(fls_new, pdata = new("NAnnotatedDataFrame", pd),
+			  mode = "onDisk")
+#+END_SRC
+
+*** Chromatographic peak detection
+
++ Aim: identify chromatographic peaks in the data.
++ Function: =findChromPeaks=.
++ Available methods:
+  - /matchedFilter/ (=MatchedFilterParam=) \cite{Smith:2006ic}.
+  - /centWave/ (=CentWaveParam=) \cite{Tautenhahn:2008fx}.
+  - /massifquant/ (=MassifquantParam=) \cite{Conley:2014ha}.
+
++ CentWave:
+#+NAME: centwave-help
+#+BEGIN_SRC R :ravel results = "hide"
+  ?CentWaveParam
+#+END_SRC
++ CentWave is a two-step approach:
+  - identify regions of interest
+  - peak detection within this regions using wavelet transform
+
++ Crucial parameters: =peakwidth=, =ppm=.
++ =peakwidth=: minimum and maximal expected peak width. Depends on the LC
+  settings of the experiment.
++ Example: test 
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Get the XIC for serine in the first file
+  srn_chr <- chromatogram(data_cent, rt = c(165, 200),
+			  mz = c(106.03, 106.06))[1, 1]
+  plot(srn_chr)
+
+  cwp <- CentWaveParam()
+  cwp
+
+  ## "dry-run" peak detection on the XIC.
+  findChromPeaks(srn_chr, param = cwp)
+
+  cwp <- CentWaveParam(peakwidth = c(2, 10))
+  ## "dry-run" peak detection on the XIC.
+  pks <- findChromPeaks(srn_chr, param = cwp)
+  rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040")
+#+END_SRC
+
++ How can we find appropriate values for these parameters?
++ =peakwidth=: look at signal for some expected compounds in the samples.
++ =ppm=: maximal allowed scattering of m/z values for one ion.
+
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Scattering of values.
+  srn <- data_cent %>%
+      filterRt(rt = c(179, 186)) %>%
+      filterMz(mz = c(106.04, 106.06))
+
+  plot(srn, type = "XIC")
+#+END_SRC
+
+*** Alignment
+
++ Aim: adjusts shifts in retention times between samples.
++ Function: =adjustRtime=.
++ Available methods:
+
+*** Correspondence
+
++ Aim: group signal from the same ion across samples.
++ Function: =groupChromPeaks=.
++ Methods available:
+  - /peak density/ (=PeakDensityParam=) \cite{Smith:2006ic}.
+  - /nearest/ (=NearestPeaksParam=) \cite{Katajamaa:2006jh}.
+** Conclusion
+
++ Don't blindly use default parameters!
++ The new data objects and functions should simplify the process of inspecting
+  results and defining algorithm parameters.
++ More work to come for the analysis of chromatographic data (SRM/MRM).
+
+** References
+
+
+
+
