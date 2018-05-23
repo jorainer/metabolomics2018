@@ -33,7 +33,6 @@ by exporting the metabolomics-preprocessing.org file.
     -   new functions
     -   internal changes and code cleanup
 
-
 ## Mass spectrometry
 
 -   Mass spectrometry (MS) allows to measure abundances of charged ions in a
@@ -44,7 +43,7 @@ by exporting the metabolomics-preprocessing.org file.
 
 -   Many ions with the same/similar mass-to-charge ratio m/z.
 -   Additional separation of compounds by additional properties
-    (hydrophob/hydrophil): liquid or gas chromatpgraphy.
+    (hydrophobic/hydrophilic): liquid or gas chromatography.
 
 ![](images/LCMS.png)
 
