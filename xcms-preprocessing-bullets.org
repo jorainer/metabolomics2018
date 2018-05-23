@@ -199,7 +199,7 @@ The workflow is focused on the *new* =xcms= interface/functions and covers:
 + Data access will be fast on indexed mzML, mzXML and CDF files.
 + Interactive code: extract all spectra measured between 180 and 181
   seconds. Using the =%>%= (pipe) operator to avoid nested function calls.
-
+  
 #+NAME: spectra-filterRt
 #+BEGIN_SRC R :ravel message = FALSE
   ## Get all spectra measured between 180 and 181 seconds
