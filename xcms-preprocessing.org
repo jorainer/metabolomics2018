@@ -33,8 +33,9 @@ by exporting the metabolomics-preprocessing.org file.
 -->
 #+END_EXPORT
 
-** Background
+* Background
 
+This documents describes 
 + =xcms= a relatively /old/ package for untargeted, LC/GC-MS data preprocessing.
 + Major changes in =xcms= version > 3:
   - re-use data structures from Bioconductor's =MSnbase= package.
@@ -44,24 +45,33 @@ by exporting the metabolomics-preprocessing.org file.
 
 ** Mass spectrometry
 
-+ Mass spectrometry (MS) allows to measure abundances of charged ions in a
-  sample.
-+ Data is represented/measured in a spectrum.
+Mass spectrometry allows to measure abundances of charged ions in a
+sample. Abundances are determined as ion counts for a specific mass-to-charge
+ration m/z. The measured signal is represented in a spectrum, intensities along
+a m/z ratio.
+
 #+BEGIN_EXPORT html
 ![](images/MS.png)
 #+END_EXPORT
 
-+ Many ions with the same/similar mass-to-charge ratio m/z.
-+ Additional separation of compounds by additional properties
-  (hydrophobic/hydrophilic): liquid or gas chromatography.
+Many ions have the same or a very similar mass-to-charge ratio and MS is thus
+frequently coupled with a second technology to separate the analytes based on
+other properties than their charge (e.g. hydrophilic/hydrophobic. Common choices
+are gas chromatography (GC) or liquid chromatography (LC). Such a e.g. LC-MS
+setup performs thus scans at discrete time points resulting in a set of spectra
+for a given sample, with compounds separated both on m/z and on retention time
+dimension.
+
 #+BEGIN_EXPORT html
 ![](images/LCMS.png)
 #+END_EXPORT
 
-+ LC-MS based untargeted metabolomics: identify /chromatographic/ peaks.
+In LC-MS data analysis ions are quantified by identifying and
+integrating signal from /chromatographic/ peaks.
 
 ** Definitions and common naming convention
 
+Below naming conventions and terms used throughout this document are listed:
 + chromatographic peak: peak containing the signal from an ion in retention time
   dimension.
 + chromatographic peak detection: process in which chromatographic peaks are
@@ -74,21 +84,25 @@ by exporting the metabolomics-preprocessing.org file.
 * Workflow: metabolomics data preprocessing using =xcms=
 
 This workflow describes the basic data handling (I/O) of mass spectrometry data
-using the =MSnbase= package, and the LC/GC-MS data preprocessing using =xcms=. The
-first part if focused on data import, access and visualization followed by a
-short description of a simple data centroiding approach and concluded by the
-=xcms=-based LC-MS data preprocessing that comprises chromatographic peak
-detection, alignment and correspondence. The workflow does not cover data
-normalization procedures and differential abundance analysis.
+using the =MSnbase= package, and the LC/GC-MS data preprocessing using =xcms=. It
+showcases the new functionality and user interface functions of =xcms=, that
+re-use functionality from the =MSnbase= package. The first part of the workflow if
+focused on data import, access and visualization followed by a short description
+of a simple data centroiding approach and concluded by the =xcms=-based LC-MS data
+preprocessing that comprises chromatographic peak detection, alignment and
+correspondence. The workflow does not cover data normalization procedures,
+compound identification and differential abundance analysis.
 
 ** Prerequisites
 
-+ Rstudio
-+ R version >= 3.5.0
-+ Libraries:
+The analysis in this document requires an R version >= 3.5.0 and recent versions
+of the =MSnbase= and =xcms= (version >= 3.3.1 is needed). The code below installs
+all packages for the analysis.
+
+#+NAME: install-required
 #+BEGIN_SRC R :ravel eval = FALSE, results = "hide"
   source("https://bioconductor.org/biocLite.R")
-  biocLite(c("xcms", "MSnbase", "doParallel", "rgl", "msdata", "magrittr",
+  biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr",
 	     "devtools"))
   ## Need xcms version > 3.3.1
   if (packageVersion("xcms") < "3.3.1")
@@ -98,12 +112,17 @@ normalization procedures and differential abundance analysis.
 ** Data import and representation
 
 Below we load all required libraries and read our toy data using the =readMSData=
-function. We also define a =data.frame= describing the experiment and pass this to
-the =readMSData=. We thus have all experiment-related information within the same
-data object. The option =mode = "onDisk"= tells the function to read only general
-metadata into memory. The m/z and intensity values from the original files are
-not stored in memory, but retrieved from the original files on demand. This
-enables the analysis also of very large experiments.
+function. The data set consists of subsets of two files in mzML format, with
+pooled human serum samples measured with a ultra high performance liquid
+chromatography (UHPLC) system (Agilent 1290) coupled with a Q-TOF MS (TripleTOF
+5600+ AB Sciex). Chromatographic separation based on hydrophilic interaction
+liquid chromatography (HILIC). The system was tuned to allow measurement of the
+/polar metabolome/. We also define a =data.frame= describing the experiment and pass
+this to the =readMSData=. We thus have all experiment-related information within
+the same data object. The option =mode = "onDisk"= tells the function to read only
+general metadata into memory. The m/z and intensity values from the original
+files are not stored in memory, but retrieved from the original files on
+demand. This enables the analysis also of very large experiments.
 
 #+NAME: load-data
 #+BEGIN_SRC R :ravel message = FALSE
@@ -125,9 +144,9 @@ enables the analysis also of very large experiments.
 #+END_SRC
 
 Next we set up the parallel processing. This ensures that all required cores are
-registered already at the start. All data access and analysis functions of =xcms=
-and =MSnbase= are parallelized on a per-file basis and will use this setup by
-default.
+registered and available from the beginning of the analysis. All data access and
+analysis functions of =xcms= and =MSnbase= are parallelized on a per-file basis and
+will use this setup by default.
 
 #+NAME: parallel-setup
 #+BEGIN_SRC R :ravel message = FALSE
@@ -136,27 +155,34 @@ default.
   register(bpstart(DoparParam()), default = TRUE)
 #+END_SRC
 
-The experiment is now represented as an =OnDiskMSnExp= object. Phenotype
+The experiment data is now represented as an =OnDiskMSnExp= object. Phenotype
 information can be retrieved with the =pData= function, or directly using =$=. As
 detailed above, only general information of each spectrum is stored in the
-object. This can be accessed with the =fData= function.
+object enabling analyses also of very large experiments. Below we access sample
+descriptions.
 
-#+NAME: show-fData
+#+NAME: show-pData
 #+BEGIN_SRC R :ravel message = FALSE
-  data
-
   ## Access phenotype information
   pData(data)
 
   ## Or individual columns directly using the $ operator
   data$injection_idx
+#+END_SRC
 
+The general information on each spectrum in the experiment can be accessed with
+the =fData= function, that returns a =data.frame= with one row per spectrum.
+
+#+NAME: show-fData
+#+BEGIN_SRC R :ravel message = FALSE
   ## Access spectrum header information
   head(fData(data))
 #+END_SRC
 
-+ Note: with the data not being in memory, any data manipulation (such as
-  smoothing) is never applied to the data but is performed on-the-fly.
+Note that, since the data is not kept in memory, any data manipulations (such as
+spectrum smoothing) do not change the data, but are instead added to a lazy
+evaluation queue and applied to the data on the fly, each time m/z or intensity
+values are accessed.
 
 ** Basic data access and visualization
 
@@ -173,9 +199,6 @@ comes. This is shown in the code block below.
   ## Get the retention time
   head(rtime(data))
 
-  ## How many spectra are there?
-  length(rtime(data))
-
   ## Get the retention times splitted by file.
   rts <- split(rtime(data), fromFile(data))
 
@@ -185,12 +208,13 @@ comes. This is shown in the code block below.
 #+END_SRC
 
 The =spectra= function can be used to retrieve the list of all spectra (from all
-files). This will load the full data from all raw files, which can take,
+files). This will load the full data from all raw files (eventually applying
+data manipulations stored in the lazy processing queue), which can take,
 depending on the size of the experiment, a relatively long time. In most cases
 we will however work anyway with sub-sets of the data, and retrieving such data
 can be, in the case of indexed mzML, mzXML and CDF files, very fast. Data
-objects can be easily subsetted using filter functions, such as =filterFile=,
-=filterRtime=, =filterMz= or =filterMsLevel= to filter the data by file, retention
+objects can be easily subsetted using the filter functions: =filterFile=,
+=filterRtime=, =filterMz= or =filterMsLevel= that filter the data by file, retention
 time range, m/z range or MS level. To illustrate this we retrieve below all
 spectra measured between 180 and 181 seconds. Note that we use the pipe operator
 =%>%= from the =magrittr= package to avoid nested function calls.
@@ -202,16 +226,29 @@ spectra measured between 180 and 181 seconds. Note that we use the pipe operator
   sps <- data %>%
       filterRt(rt = c(180, 181)) %>%
       spectra
+#+END_SRC
 
+The result is a =list= of =Spectrum= objects. Below we determine the number of
+spectra we've got.
+
+#+NAME: spectra-filterRt-length
+#+BEGIN_SRC R :ravel message = FALSE
   ## How many spectra?
   length(sps)
+#+END_SRC
 
+We can use the =fromFile= function to determine from which file/sample each
+spectrum is.
+
+#+NAME: spectra-filterRt-fromFile
+#+BEGIN_SRC R :ravel message = FALSE
   ## From which file?
   sapply(sps, fromFile)
 #+END_SRC
 
 We have thus 3 spectra per file. Below we plot the data from the last spectrum
-(i.e. the 3rd spectrum in the retention time window from the second file).
+(i.e. the 3rd spectrum in the present retention time window from the second
+file).
 
 #+NAME: spectrum-plot
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Spectrum at a retention time of about 180 seconds."
@@ -222,14 +259,15 @@ We can immediately spot several mass peaks in the spectrum, with the largest one
 at a m/z of about 130 and the second largest at about 106, which matches the
 expected mass to charge ratio for the [M+H]+ adduct of Serine. 
 
-While MS data is in general organized by spectrum, in LC-MS experiments we are
-used to analyze the data along the retention time axis. To extract
-/chromatographic/ data we can use the =chromatogram= method. The function aggregates
-intensities for each scan/retention time along the m/z axis and returns the
-retention time - intensity duplets in a =Chromatogram= object, one per file. The
-=Chromatogram= object supports the =rtime= and =intensity= functions to extract the
-respective information. Below we use the =chromatogram= function to extract the
-total ion chromatogram (TIC) for each file.
+MS data is in general organized by spectrum, but in LC-MS experiments we analyze
+the data along the retention time axis and hence orthogonally to the data
+representation in a spectrum. We can use the =chromatogram= function to extract
+such data. The function aggregates intensities for each scan/retention time
+along the m/z axis (i.e. within each spectrum) and returns the retention time -
+intensity duplets in a =Chromatogram= object, one per file. The =Chromatogram=
+object supports, similar to the =Spectrum= object, the =rtime= and =intensity=
+functions to extract the respective information. Below we use the =chromatogram=
+function to extract the total ion chromatogram (TIC) for each file and plot it.
 
 #+NAME: chromatogram-tic
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Total ion chromatogram.", fig.width = 10, fig.height = 5
@@ -241,14 +279,35 @@ total ion chromatogram (TIC) for each file.
   plot(chr)
 #+END_SRC
 
+The object returned by the =chromatogram= function arranges the individual
+=Chromatogram= objects of each file in a two-dimensional array, columns being
+samples (files) and rows data slices. Below we extract the (total ion)
+intensities from the TIC of the first file.
+
+#+NAME: chromatogram-tic-intensity
+#+BEGIN_SRC R :ravel message = FALSE
+  ints <- intensity(chr[1, 1])
+  head(ints)
+#+END_SRC
+
+The object contains also the phenotype information from the original =data=
+variable, that can be accessed similarly to the =OnDiskMSnExp= object (or most
+other data objects in Bioconductor).
+
+#+NAME: chromatogram-pdata
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Access the full phenotype data
+  pData(chr)
+#+END_SRC
+
 Depending on the parameter =aggregationFun=, the function can produce total ion
-chromatograms (TIC) with =aggregationFun = "sum"= or base peak chromatograms (BPC)
-with =aggregationFun = "max"=. Below we extract the ion chromatogram for Serine by
-first filtering the data object by retention time, then by m/z and finally
-plotting it.
+chromatograms (TIC), with =aggregationFun = "sum"= or base peak chromatograms
+(BPC) with =aggregationFun = "max"=. Below we extract and plot the ion
+chromatogram for Serine after first filtering the data object by retention time
+and by m/z.
 
 #+NAME: serine-xic
-#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Extracted ion chromatogram for the Serine [M+H]+ ion."
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Extracted ion chromatogram for the Serine [M+H]+ ion in both files."
   ## Extract and plot the XIC for Serine
   data %>%
       filterRt(rt = c(175, 189)) %>%
@@ -257,23 +316,29 @@ plotting it.
       plot()
 #+END_SRC 
 
-+ Easy to access sub-sets of the raw data.
-+ =spectra= to get intensities along m/z for discrete retention time.
-+ =chromatogram= to get intensities along rt for m/z range. 
-+ Use =rtime=, =mz=, =intensity= to access the MS values.
 
 ** Centroiding of profile MS data
 
-+ /centroiding/ is the process in which mass peaks are reduced to a single,
-  representative signal, their centroids.
-+ =xcms=, specifically /centWave/ was designed for centroided data.
-+ Proper centroiding can improve data accuracy.
-+ =MSnase= provides basic tools to perform MS data smoothing and centroiding:
-  =smooth= and =pickPeaks=.
-+ Interactive code: show the combined m/z, rt and intensity data for Serine.
+MS instruments allow to export data in profile or centroid mode. Profile data
+contains the signal for all discrete m/z values (and retention times) for which
+the instrument collected data \cite{Smith:2014di}. For each ion at a given
+retention time the instrument measures thus multiple intensities, at m/z values
+that are distributed around the ion's m/z value. Centroiding is the process to
+reduce these mass peaks to a single representative signal, the centroid. =xcms=,
+specifically the /centWave/ chromatographic peak detection algorithm, was designed
+for centroided data, thus, prior to data analysis, profile data should be
+centroided. The =MSnbase= package provides the basic toolset to perform
+centroiding (and data smoothing): =pickPeaks= and =smooth=. 
+
+Below we inspect the profile data for the [M+H]+ ion adduct of Serine. We subset
+the data to the m/z and retention time range containing signal from Serine and
+=plot= the data with =type = "XIC"=, that generates a combined chromatographic and
+/map/ visualization of the data (i.e. a plot of the individual m/z, rt and
+intensity data tuples with the data points shown in the m/z - retention time
+space with intensity-dependent coloring).
 
 #+NAME: serine-profile-mode-data
-#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Profile data for Serine."
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Profile data for Serine.", fig.width = 10, fig.height = 5, fig.pos = "h!", warning = FALSE
   ## Filter the MS data to the signal from the Serine ion and plot it using
   ## type = "XIC"
   data %>%
@@ -282,14 +347,17 @@ plotting it.
       plot(type = "XIC")
 #+END_SRC
 
-+ plot =type = "XIC"= creates a combined chromatographic and /map/ visualization of
-  the data.
-+ Interactive code: smooth data in m/z dimension using a Savitzky-Golay filter
-  followed by a centroiding that simply reports the maximum signal for each mass
-  peak in each spectrum. See =?pickPeaks= for more advanced options.
+The plot shows all registered and exported data points from the instrument. The
+plot above clearly shows the mass peaks for Serine, that are represented by a
+distribution of signal in both retention time and m/z dimension.
+
+Next we first smooth the data per spectrum using a Savitzky-Golay filter, which
+usually improves data quality by reducing noise, followed by centroiding the
+data with a simple peak-picking strategy that reports the maximum signal for
+each mass peak in each spectrum.
 
 #+NAME: centroiding
-#+BEGIN_SRC R :ravel message = FALSE, warning = FALSE, fig.cap = "Centroided data for Serine.", fig.width = 10, fig.height = 5
+#+BEGIN_SRC R :ravel message = FALSE, warning = FALSE, fig.cap = "Centroided data for Serine.", fig.width = 10, fig.height = 5, fig.pos = "h!", warning = FALSE
   ## Smooth the signal, then do a simple peak picking.
   data_cent <- data %>%
       smooth(method = "SavitzkyGolay", halfWindowSize = 6) %>%
@@ -302,10 +370,25 @@ plotting it.
       plot(type = "XIC")
 #+END_SRC
 
-+ Note: data smoothing and centroiding is applied to the data /on-the-fly/, each
-  time m/z or intensity values are accessed. To make the centroiding /persistent/
-  we need to export the centroided data.
-+ Interactive code: export the smoothed data to new files and re-read the data.
+As expected, centroiding successfully reduced the data to a single data point
+for an ion in each spectrum. For more advanced centroiding options that also
+fine-tune the m/z value of the reported centroid see the =pickPeaks= help or the
+centroiding vignette in =MSnbase=.
+
+Note that, since the MS data is not loaded in memory, smoothing and centroiding
+is applied to the data /on-the-fly/ each time that m/z or intensity values are
+requested from the data object =data_cent=. To make any data manipulations on an
+=OnDiskMSnExp= object /persistent/ we need to export the data. Below we save thus
+the centroided data as mzML files and read the exported data again.
+
+#+NAME: export-centroided-prepare
+#+BEGIN_SRC R :ravel message = FALSE, echo = FALSE, warnings = FALSE, results = "hide"
+  ## Silently removing exported mzML files if they do already exist.
+  lapply(basename(fileNames(data)), function (z) {
+      if (file.exists(z))
+	  file.remove(z)
+  })
+#+END_SRC
 
 #+NAME: export-centroided
 #+BEGIN_SRC R :ravel message = FALSE
