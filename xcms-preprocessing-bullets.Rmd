@@ -550,7 +550,7 @@ plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
   same m/z and similar retention time: isomers Betaine and Valine ([M+H]+ m/z
   118.08625).
 
-```{r correspondence-bw, message = FALSE, fig.cap = "Define correspondence settings to separate Methylhistidine peaks.", fig.width = 10, fig.height = 10 }
+```{r correspondence-bw, message = FALSE, fig.cap = "Define correspondence settings to separate Betaine and Valine peaks.", fig.width = 10, fig.height = 10 }
 par(mfrow = c(3, 1), mar = c(3, 4.3, 1, 1))
 
 ## Plot the chromatogram for an m/z slice containing Betaine and Valine

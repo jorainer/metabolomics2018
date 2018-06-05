@@ -316,7 +316,6 @@ time and by m/z ranges containing the signal for this compound.
       plot()
 #+END_SRC 
 
-
 ** Centroiding of profile MS data
 
 MS instruments allow to export data in profile or centroid mode. Profile data
@@ -408,27 +407,27 @@ the centroided data as mzML files and read the exported data again.
 
 Chromatographic peak detection aims to identify peaks along the retention time
 axis that represent the signal from individual compounds' ions. This can be
-performed with the =findChromPeaks= function that uses different algorithms
-depending on the submitted parameter object: with =MatchedFilterParam= it performs
-peak detection as described in the original xcms article
-\cite{Smith:2006ic}. With =CentWaveParam= a continuous wavelet
-transformation-based peak detection is performed that can detect close-by and
+performed with the =findChromPeaks= function and one of different algorithms that
+are selected depending on the submitted parameter object: with
+=MatchedFilterParam= it performs peak detection as described in the original xcms
+article \cite{Smith:2006ic}. With =CentWaveParam= a continuous wavelet
+transformation (CWT)-based peak detection is performed that can detect close-by and
 partially overlapping peaks with different widths \cite{Tautenhahn:2008fx}. With
 =MassifquantParam= it performs a Kalman filter-based peak detection
 \cite{Conley:2014ha}. Additional peak detection algorithms for direct injection
-data are also available, but not discussed here. 
+data are also available, but not discussed here.
 
 We use the /centWave/ algorithm that performs peak detection in two steps: first
 it identifies regions of interest in the m/z - retention time space and
 subsequently detects peaks in these regions using a continuous wavelet transform
 (see the original publication for more details). centWave can be configured with
 several parameters (see =?CentWaveParam=), with the most important ones being
-=peakwidth= and =ppm=. =peakwidth= defines the minimal and maximal expected width (in
-retention time dimension) of the peak and depends thus on the LC settings of the
-experiment. Appropriate values for this parameter can be defined by looking at
-extracted ion chromatograms of known compounds in the data. Below we extract 
-chromatographic data for Serine and perform a peak detection on the =Chromatogram=
-object using the default parameters for centWave.
+=peakwidth= and =ppm=. =peakwidth= defines the minimal and maximal expected width of
+the peak in retention time dimension and depends thus on the LC settings of the
+experiment. Appropriate values for this parameter can be defined based on
+extracted ion chromatograms of known compounds. Below we extract chromatographic
+data for Serine and perform a peak detection on the =Chromatogram= object using
+the default parameters for centWave.
 
 #+NAME: centWave-default
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "XIC for Serine", results = "hide"
@@ -449,18 +448,19 @@ object using the default parameters for centWave.
 
 The warning message tells us that centWave did not find any peaks in that
 chromatogram. Looking at the default values for the centWave parameters helps
-understanding why peak detection fails:
+understanding why the peak detection failed:
 
 #+NAME: centWave-default-parameters
 #+BEGIN_SRC R :ravel message = FALSE
   cwp
 #+END_SRC
 
-The default settings for =peakwidth= are 20 to 50 seconds, while the
-chromatographic peak for Serine above is about 4 seconds wide. Below we adapt
-the settings to accommodate peaks ranging from 2 to 10 seconds and re-run the
-peak detection. In general, it is advisable to investigate peak widths for
-several ions in the data set to determine the /best/ settings for =peakwidth=.
+The default settings for =peakwidth= are 20 to 50 seconds, while from the plot
+above it is apparent that the chromatographic peak for Serine is about 4 seconds
+wide. Below we adapt the settings to accommodate peaks ranging from 2 to 10
+seconds and re-run the peak detection. In general, it is advisable to
+investigate peak widths for several ions in the data set to determine the most
+appropriate settings for =peakwidth=.
 
 #+NAME: centWave-adapted
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "XIC for Serine with detected chromatographic peak", results = "hide"
@@ -473,16 +473,13 @@ several ions in the data set to determine the /best/ settings for =peakwidth=.
   rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040")
 #+END_SRC
 
-The next important setting is the =ppm= parameter, that is used in the initial
-step of centWave to identify regions of interest. In this step, regions are
-defined in which m/z values for an ion do not differ by more than =ppm= in
-consecutive spectra. This bases on the assumption that m/z values are more
-stable for larger signals. To illustrate this, we plot the full data for Serine.
-
-
-+ Ideally check settings on more known compounds.
-+ =ppm=: maximal allowed scattering of m/z values for one ion.
-+ Interactive code: evaluate the m/z scattering of the signal for Serine.
+Another important parameter is =ppm=, used in the initial identification of the
+regions of interest that are then subject for the CWT-based peak detection. A
+/real/ signal from an ion is expected to yield stable m/z values in consecutive
+scans (the scattering of the m/z values around the /real/ m/z value of the ion is
+supposed to be inversely related with its intensity). In centWave, all data
+points that differ by less than =ppm= in consecutive spectra are combined into a
+region of interest. To illustrate this, we plot the full data for Serine.
 
 #+NAME: Serine-mz-scattering-plot
 #+BEGIN_SRC R :ravel message = FALSE
@@ -495,9 +492,9 @@ stable for larger signals. To illustrate this, we plot the full data for Serine.
   plot(srn, type = "XIC")
 #+END_SRC
 
-Indeed higher intensity signals tend to scatter less in m/z dimension. We next
-calculate for this data subset the difference in m/z values between consecutive
-scans.
+As expected, higher intensity signals tend to scatter less in m/z dimension. We
+next calculate for this data subset the difference in m/z values between
+consecutive scans.
 
 #+NAME: define-ppm
 #+BEGIN_SRC R :ravel message = FALSE
@@ -509,10 +506,11 @@ scans.
   diff(srn_df$mz) * 1e6 / mean(srn_df$mz)
 #+END_SRC
 
-The difference in m/z values for the Serine data is between 0 and 27
-ppm. Ideally this should be evaluated for several compounds and should be set to
+The difference in m/z values for the Serine data is thus between 0 and 27
+ppm. This should be evaluated for several compounds and should ideally be set to
 a value that allows to capture the full chromatographic peaks for most of the
-tested compounds. We can next perform the peak detection based on our settings.
+tested compounds. We can next perform the peak detection using our settings for
+the =ppm= and =peakwidth= parameters.
 
 #+NAME: findPeaks-centWave
 #+BEGIN_SRC R :ravel message = FALSE
@@ -523,10 +521,10 @@ tested compounds. We can next perform the peak detection based on our settings.
 
 The result from the =findChromPeaks= call is an =XCMSnExp= object which contains all
 preprocessing results and, by extending the =OnDiskMSnExp= object, inherits all of
-the functionality described so far. The results from the peak detection analysis
-can be accessed with the =chromPeaks= function, that, with the optional =rt= and =mz=
-parameters, allows to extract identified chromatographic peaks from specific
-areas in the data.
+its functionality that has bee described so far. The results from the peak
+detection analysis can be accessed with the =chromPeaks= function, that, with the
+optional =rt= and =mz= parameters, allows to extract identified chromatographic
+peaks from specific areas in the data.
 
 #+NAME: xcmsnexp
 #+BEGIN_SRC R :ravel message = FALSE, results = "hide"
@@ -553,32 +551,47 @@ the location of the identified chromatographic peaks in the m/z - rt space.
 
 *** Alignment
 
-+ Aim: adjusts shifts in retention times between samples.
-+ Interactive code: plot the base peak chromatograms of all files.
+While chromatography helps to discriminate between analytes it is also affected
+by variances that lead to shifts in retention times between measurement
+runs. The alignment step aims to adjust these retention time differences between
+samples in an experiment. Below we plot the base peak chromatograms of both
+files of our toy data set to visualize these differences.
+
 #+NAME: alignment-bpc-raw
-#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "BPC of all files", fig.width = 8, fig.height = 4
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "BPC of all files.", fig.width = 8, fig.height = 4
   ## Extract base peak chromatograms
   bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
-  par(mfrow = c(1, 1))
   plot(bpc_raw)
 #+END_SRC
 
-+ Function: =adjustRtime=.
-+ Available methods:
-  - /peakGroups/ (=PeakGroupsParam=) \cite{Smith:2006ic}: align samples based on
-    hook peaks.
-  - /obiwarp/ (=ObiwarpParam=) \cite{Prince:2006jj}: warps the (full) data to a
-    reference sample.
+While both samples were measured with the same setup on the same day there are
+differences visible.
 
-+ peakGroups works reasonably well in most cases.
-+ Need to define the hook peaks first: peaks present in most/all samples.
-+ Important parameters:
-  - =minFraction=: proportion of samples in which a feature has to be present (0.9
-    for present in 90% of samples).
-  - =span=: degree of smoothing for the loess function, 0 likely overfitting, 1
-    linear regression. Values between 0.4 and 0.6 seem reasonable.
-+ Interactive code: perform a peak grouping to define potential hook peaks and
-  align the samples based on these.
+While a large number of methods have been published
+\cite{Smith:2013gr} 
+
+Alignment can be performed in =xcms= with the =adjustRtime= function that supports
+the /peakGroups/ \cite{Smith:2006ic} and the /obiwarp/ \cite{Prince:2006jj}
+method. The settings for the algorithms can be defined with the =PeakGroupsParam=
+and the =ObiwarpParam= parameter objects, respectively. In our example we use the
+peakGroups method that aligns samples based on the retention times of /hook
+peaks/, that are supposed to be present in most samples. For this approach we
+need to identify these hook peaks first, for which we employ the /peakDensity/
+correspondence analysis method. Details about this correspondence method and
+explanations on the choices for its parameters are provided in the next
+section. After having performed an initial correspondence analysis that defined
+features (i.e. grouped chromatographic peaks across samples), we perform the
+alignment using the settings =minFraction = 1= and =span = 0.6=. =minFraction= defines
+the proportion of samples in which a feature has to be detected/present. A value
+of 0.9 would e.g. require that a chromatographic peak was detected in 90% of all
+samples of the experiment. Our data represents replicated measurements of the
+same sample pool and we can thus assume that for hook peaks a peak was
+identified in all files. The parameter =span= defines the degree of smoothing of
+the loess function that is used to allow different regions along the retention
+time axis to be adjusted by a different factor. A value of 0 will most likely
+cause an overfitting, while 1 would perform a linear regression. Values between
+0.4 and 0.6 seem to be reasonable for most experiments.
+
 #+NAME: alignment-correspondence
 #+BEGIN_SRC R :ravel message = FALSE
   ## Define the settings for the initial peak grouping - details for
@@ -592,21 +605,25 @@ the location of the identified chromatographic peaks in the m/z - rt space.
   data_cent <- adjustRtime(data_cent, param = pgp)
 #+END_SRC
 
-+ Adjusted retention times are stored in the object.
-+ Interactive code: inspect the difference between raw and adjusted retention
-  times. Helps to determine whether settings were OK.
+Adjusted retention times are stored along with the raw retention times within
+the result object. Any function accessing retention times (such as =rtime=) will
+by default return adjusted retention times from an =XCMSnExp= object if
+present. Note that also the retention times of the identified chromatographic
+peaks are adjusted by the =adjustRtime= call. After alignment it is suggested to
+inspect the differences between raw and adjusted retention times.
+
 #+NAME: alignment-result
-#+BEGIN_SRC R :ravel message = FALSE, fig.width = 8, fig.height = 4
+#+BEGIN_SRC R :ravel message = FALSE, fig.width = 8, fig.height = 4, fig.cap = "Alignment results. Shown is the difference between raw and adjusted retention times and the hook peaks that were used for the alignment (shown as points)."
   ## Plot the difference between raw and adjusted retention times
   plotAdjustedRtime(data_cent)
 #+END_SRC
 
-+ Evaluate alignment results:
-  - difference between raw and adjusted retention time reasonable.
-  - hook peaks along the full retention time range.
-  - comparison of BPC (TIC) before/after alignment.
-  - evaluate data for known compounds.
-+ Interactive code: plot BPC before and after alignment.
+The difference between raw and adjusted retention time should be reasonable. In
+our example it is mostly below one second which, which is OK since the samples
+were measured on the same day. Also, hook peaks should ideally be present along
+the full retention time range. In addition we plot the base peak chromatograms
+before and after alignment to get a general overview of the alignment
+performance.
 
 #+NAME: bpc-raw-adjusted
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "BPC before (top) and after (bottom) alignment.", fig.width = 10, fig.height = 8
@@ -617,7 +634,9 @@ the location of the identified chromatographic peaks in the m/z - rt space.
   plot(chromatogram(data_cent, aggregationFun = "max"))
 #+END_SRC
 
-+ Interactive code: plot Serine XIC before and after alignment.
+The base peak chromatograms are nicely aligned after retention time
+adjustment. The impact of the alignment should also be evaluated for known
+compounds. We thus below plot the XIC for Serine before and after alignment.
 
 #+NAME: serine-xic-adjusted
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "XIC for Serine before (left) and after (right) alignment", fig.width = 10, fig.height = 4
@@ -629,24 +648,28 @@ the location of the identified chromatographic peaks in the m/z - rt space.
 		    rt = c(179, 186)))
 #+END_SRC
 
-+ If we need to repeat simply remove alignment results with =dropAdjustedRtime=
-  and retry.
+The Serine peaks are nicely aligned after adjustment. Note that if we were not
+happy with the alignment results we could simply retry with different settings
+after removing them with the =dropAdjustedRtime= function. This function restores
+also the original retention times of the identified chromatographic peaks.
 
 *** Correspondence
 
-+ Aim: group signal (peaks) from the same ion across samples.
-+ Function: =groupChromPeaks=.
-+ Methods available:
-  - /peak density/ (=PeakDensityParam=) \cite{Smith:2006ic}.
-  - /nearest/ (=NearestPeaksParam=) \cite{Katajamaa:2006jh}.
-
-+ peak density: 
-  - iterates through slices of m/z ranges and groups chromatographic in each if
-    peaks (from same or different samples) are close in retention time.
-  - whether they are close is estimated on the distribution of peaks along the
-    retention time.
-+ Interactive code: plot the data for the m/z slice containing the Serine peak
-  and dry-run a correspondence analysis.
+The final step of the LC-MS preprocessing with =xcms= is the correspondence
+analysis, in which chromatographic peaks from the same ion are grouped across
+samples to form a /feature/. =xcms= implements two methods for this purpose: /peak
+density/ \cite{Smith:2006ic} and /nearest/ \cite{Katajamaa:2006jh} that can be
+configured by passing either a =PeakDensityParam= or a =NearestPeaksParam= object to
+the =groupChromPeaks= function. For our example we use the peak density method
+that iterates through slices of m/z ranges of the data and groups
+chromatographic peaks (within the same or in other samples) in each if they are
+close enough in their retention time which is estimated based on the
+distribution of peaks along the retention time. To illustrate this we extract
+below an m/z slice containing the Serine peak and use the =plotChromPeakDensity=
+function to visualize the distribution of peaks along the retention time axis
+and /simulate/ a correspondence based on the provided settings. This function thus
+allows to test different settings for the correspondence on data subsets before
+applying them on the full data set.
 
 #+NAME: correspondence-example
 #+BEGIN_SRC R :ravel message = FALSE, results = "hide", fig.cap = "BPC for a m/z slice and defined features within this slice based on default settings." 
@@ -658,7 +681,6 @@ the location of the identified chromatographic peaks in the m/z - rt space.
 
   ## Get default parameters for the grouping
   pdp <- PeakDensityParam(sampleGroups = data_cent$group)
-  pdp
 
   ## Dry-run correspondence and show the results.
   plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
@@ -666,25 +688,31 @@ the location of the identified chromatographic peaks in the m/z - rt space.
 
 #+END_SRC
 
-+ Black line shows the peak density estimate, points represent the position of
-  peaks along the retention time axis per sample and grey rectangles indicate
-  grouped peaks (features).
-+ Parameters:
-  - =binSize=: m/z width of the bin/slice of data in which peaks are grouped.
-  - =bw= defines the smoothness of the density function.
-  - =maxFeatures=: maximum number of features to be defined in one bin.
-  - =minFraction=: minimum proportion of samples (of one group!) for which a peak
-    has to be present.
-  - =minSamples=: minimum number of samples a peak has to be present.
-+ Parameters =minFraction= and =minSamples= depend on experimental layout!
-+ =binSize= should be small enough that peaks from different ions measured at the
-  same retention time would not be grouped together.
-+ Interactive code: determine acceptable =bw= setting. Plot data for ions with
-  same m/z and similar retention time: isomers Betaine and Valine ([M+H]+ m/z
-  118.08625).
+The upper panel in the plot above shows the chromatographic data with the
+identified peaks. The lower panel shows the retention time of peaks (x-axis) per
+sample (y-axis) with the black solid line representing their distribution along
+the x-axis. Peak groups (features) are indicated with grey rectangles. The
+default settings could thus successfully group the Serine peak in each sample
+into a feature. The parameters for the peak density correspondence analysis are:
+
+- =binSize=: m/z width of the bin/slice of data in which peaks are grouped.
+- =bw= defines the smoothness of the density function.
+- =maxFeatures=: maximum number of features to be defined in one bin.
+- =minFraction=: minimum proportion of samples (of one group!) for which a peak
+  has to be present.
+- =minSamples=: minimum number of samples a peak has to be present.
+
+The parameters =minFraction= and =minSamples= depend on the experimental layout and
+should be set accordingly. =binSize= should be set to a small enough value that
+peaks from different ions measured at about the same retention time would not be
+grouped together. The most important parameter however is =bw= and, while its
+default of 30 was able to correctly group the Serine peaks, it should be
+evaluated also on other, potentially more difficult, compounds. We thus evaluate
+the performance of the default parameters on an m/z slice that contains also the
+isomers Betaine and Valine ([M+H]+ m/z 118.08625).
 
 #+NAME: correspondence-bw
-#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Define correspondence settings to separate Methylhistidine peaks.", fig.width = 10, fig.height = 10
+#+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Define correspondence settings to separate Betaine and Valine peaks.", fig.width = 10, fig.height = 10
   par(mfrow = c(3, 1), mar = c(3, 4.3, 1, 1))
 
   ## Plot the chromatogram for an m/z slice containing Betaine and Valine
@@ -701,9 +729,10 @@ the location of the identified chromatographic peaks in the m/z - rt space.
   plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
 #+END_SRC
 
-+ Reducing the =bw= enables grouping of isomer peaks into different
-  features.
-+ Interactive code: perform the correspondence analysis.
+While with default settings all peaks in the m/z slice were grouped into the
+same feature, reducing =bw= to 1.8 resulted in separate features for all
+isomers. Below we perform the correspondence using the data-set specific
+settings.
 
 #+NAME: correspondence-analysis
 #+BEGIN_SRC R :ravel message = FALSE
@@ -714,9 +743,11 @@ the location of the identified chromatographic peaks in the m/z - rt space.
   data_cent <- groupChromPeaks(data_cent, param = pdp)
 #+END_SRC
 
-+ Evaluate results after correspondence: check for another slice with isomers:
-  Leucine, Isoleucine ([M+H]+ m/z 132.10191). Setting =simulate = FALSE= shows the
-  actual grouping results.
+The performance of the correspondence analysis should also be evaluated on some
+known compounds. We thus check the results for another m/z slice that contain
+the isomers Leucine and Isoleucine ([M+H]+ m/z 132.10191). Using
+=plotChromPeakDensity= with =simulate = FALSE= will show the actual results from the
+correspondence analysis.
 
 #+NAME: correspondence-evaluate
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Result of correspondence on a slice containing the isomers Leucine and Isoleucine.", fig.width = 10, fig.heigt = 8
@@ -731,52 +762,64 @@ the location of the identified chromatographic peaks in the m/z - rt space.
 		       simulate = FALSE)
 #+END_SRC
 
-+ Interactive code: inspect result object and extract feature intensities.
+Despite being very close, peaks of isomers were successfully grouped
+into separate features. The results from the correspondence analysis can be
+accessed with the =featureDefinition= function. This function returns a data frame
+with the rt and m/z ranges of the apex positions from the peaks assigned to the
+feature and their respective indices in the =chromPeaks= matrix.
 
-#+NAME: correspondence-result-object
-#+BEGIN_SRC R :ravel message = FALSE
-  ## Get general information
-  data_cent
-
-  ## Overview of the performed processings
-  processHistory(data_cent)
-
-  ## Access the parameter class for a processing step
-  processParam(processHistory(data_cent)[[1]])
-#+END_SRC
-
-+ Interactive code: inspect definition of features and extract feature
-intensities.
-
-#+NAME: correspondence-feature-values
+#+NAME: correspondence-featureDefinitions
 #+BEGIN_SRC R :ravel message = FALSE
   ## Definition of the features
   featureDefinitions(data_cent)
+#+END_SRC
 
+Also, we can calculate simple per-feature summary statistic with the
+=featureSummary= function. This function reports for each feature the total number
+and the percentage of samples in which a peak was detected and the total numbers
+and percentage of these samples in which more than one peak was assigned to the
+feature.
+
+#+NAME: correspondence-featureSummary
+#+BEGIN_SRC R :ravel message = FALSE
   ## Per-feature summary.
   head(featureSummary(data_cent))
+#+END_SRC
 
+The matrix with the feature intensities can be extracted with the =featureValues=
+function. This function uses the feature definitions to extract the requested
+value from each chromatographic peak assigned to the feature and returns a
+matrix with rows being features and columns samples. The function takes two
+additional parameters =value= and =method=: =value= defines the column in the
+=chromPeaks= table that should be reported and =method= the approach to handle cases
+in which more than one peak in a sample is assigned to the feature. Below we set
+=value = "into"= to extract the total integrated peak area and =method = "maxint"=
+to report the peak area of the peak with the largest intensity for features with
+multiple peaks in a sample.
+
+#+NAME: correspondence-featureValue
+#+BEGIN_SRC R :ravel message = FALSE
   ## feature intensity matrix
   fmat <- featureValues(data_cent, value = "into", method = "maxint")
   head(fmat)
+
 #+END_SRC
 
-+ =featureValues= parameters:
-  - =value=: name of the column in =chromPeaks= that should be returned.
-  - =method=: for features with multiple peaks in one sample: from which peak the
-    should the value be returned?
-
-+ About missing values: peak detection may have failed. =fillChromPeaks= allows to
-  fill in signal for missing peaks from the feature area (defined by the median
-  rt and mz of all peaks assigned to the feature).
-  Parameters:
-  - =expandMz=: expands the region from which signal is integrated in m/z
-    dimension. A value of 0 means no expansion, 1 means the region is grown by
-    half of the feature's m/z width on both sides.
-  - =expandRt=: expand the retention time window of the feature for integration.
-  - =ppm=: expand the m/z width by a m/z dependent value.
-+ Interactive code: evaluate the number of missing peaks and use =fillChromPeaks=
-  to retrieve a signal for them from the raw files.
+Among the first rows in that matrix we can spot already an =NA= value. No peak was
+assigned to the feature /FT002/ in the second sample, either because peak
+detection failed in that sample, or the corresponding ion is not present in that
+sample. With the =fillChromPeaks= function, =xcms= provides the functionality to
+/fill-in/ missing peak data from the feature area (which is defined by the median
+rt and m/z of all peaks assigned to the feature). Several settings allow to
+increase this feature region in m/z and/or retention time dimension: =expandMz=
+and =expandRt= expand the region relative to the width of the area in either m/z
+or rt dimension. =expandMz= would for expand the region by half of each feaature's
+width on both sides hence resulting in a region twice the size of the original
+feature in m/z. Finally, =ppm= allows to expand the m/z width of each region by an
+m/z dependent value. Note that in future the function will gain two more
+settings =fixedMz= and =fixedRt= to enable expansion of the feature area also by a
+constant value. Below we first determine the number of missing values in the
+data matrix and subsequently use =fillChromPeaks= to fill-in some missing peaks.
 
 #+NAME: fillChromPeaks
 #+BEGIN_SRC R :ravel message = FALSE
@@ -794,7 +837,37 @@ intensities.
   head(fmat_fld)
 #+END_SRC
 
-+ Note: =dropFilledChromPeaks= removes filled-in peaks again.
+With =fillChromPeaks= we could /rescue/ signal for all but 4 features with missing
+values. Note that filled-in peak information can also be removed any time with
+the =dropFilledChromPeaks= function. Also, setting =filled = FALSE= in the
+=featureValues= function would return only data from detected peaks.
+
+The data analysis would now continue on the feature matrix and could comprise
+normalization of the abundances, identification of the compounds and
+differential abundance analysis.
+
+One final thing worth mentioning is that =XCMSnExp= objects keep, next to the
+preprocessing results, also a history of all processing steps that have been
+performed with it. This can be accessed with the =processHistory= function.
+
+#+NAME: correspondence-result-object
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Overview of the performed processings
+  processHistory(data_cent)
+
+#+END_SRC
+
+Also all parameter objects defining the settings for each analysis step are
+stored internally. Below we access for example the parameter object from the
+first preprocessing step.
+
+#+NAME: correspondence-history
+#+BEGIN_SRC R :ravel message = FALSE
+  ## Access the parameter class for a processing step
+  processParam(processHistory(data_cent)[[1]])
+
+#+END_SRC
+
 
 * Summary
 
