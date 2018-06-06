@@ -1,8 +1,10 @@
 ---
 title: "Metabolomics data pre-processing using xcms"
-author: "Johannes Rainer (johannes.rainer@eurac.edu)\ngithub/twitter: jotsetung"
+author: 
+- name: "Johannes Rainer"
+  affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github/twitter: jotsetung"
 graphics: yes
-date: "`r doc_date()`"
+date: "24 June 2018"
 output:
   BiocStyle::html_document:
     number_sections: true
@@ -39,31 +41,32 @@ This documents describes
 
 Mass spectrometry allows to measure abundances of charged ions in a
 sample. Abundances are determined as ion counts for a specific mass-to-charge
-ration m/z. The measured signal is represented in a spectrum, intensities along
-a m/z ratio.
+ratio m/z. The measured signal is represented in a spectrum, intensities along
+m/z.
 
 ![](images/MS.png)
 
-Many ions have the same or a very similar mass-to-charge ratio and MS is thus
-frequently coupled with a second technology to separate the analytes based on
-other properties than their charge (e.g. hydrophilic/hydrophobic. Common choices
-are gas chromatography (GC) or liquid chromatography (LC). Such a e.g. LC-MS
-setup performs thus scans at discrete time points resulting in a set of spectra
-for a given sample, with compounds separated both on m/z and on retention time
+Many ions have the same or a very similar m/z and MS is thus frequently coupled
+with a second technology to separate the analytes based on other properties than
+their charge (e.g. hydrophilic/hydrophobic). Common choices are gas
+chromatography (GC) or liquid chromatography (LC). Such a e.g. LC-MS setup
+performs thus scans at discrete time points resulting in a set of spectra for a
+given sample, with compounds separated both on m/z and on retention time
 dimension.
 
 ![](images/LCMS.png)
 
-In LC-MS data analysis ions are quantified by identifying and
-integrating signal from *chromatographic* peaks.
+In LC-MS data analysis ions are quantified by identifying and integrating signal
+from *chromatographic* peaks.
 
 
 ## Definitions and common naming convention
 
-Below naming conventions and terms used throughout this document are listed:
+Naming conventions and terms used throughout this document are:
 
 -   chromatographic peak: peak containing the signal from an ion in retention time
-    dimension.
+    dimension (different from a *mass* peak that represents the signal along the m/z
+    dimension within a spectrum.
 -   chromatographic peak detection: process in which chromatographic peaks are
     identified within each file.
 -   alignment: process that adjusts for retention time differences between files.
@@ -78,8 +81,8 @@ This workflow describes the basic data handling (I/O) of mass spectrometry data
 using the `MSnbase` package, and the LC/GC-MS data preprocessing using `xcms`. It
 showcases the new functionality and user interface functions of `xcms`, that
 re-use functionality from the `MSnbase` package. The first part of the workflow is
-focused on data import, access and visualization followed the description of a
-simple data centroiding approach and concluded by the `xcms`-based LC-MS data
+focused on data import, access and visualization followed by the description of
+a simple data centroiding approach and concluded by the `xcms`-based LC-MS data
 preprocessing that comprises chromatographic peak detection, alignment and
 correspondence. The workflow does not cover data normalization procedures,
 compound identification and differential abundance analysis.
@@ -88,8 +91,8 @@ compound identification and differential abundance analysis.
 ## Prerequisites
 
 The analysis in this document requires an R version >= 3.5.0 and recent versions
-of the `MSnbase` and `xcms` (version >= 3.3.1 is needed). The code below installs
-all packages for the analysis.
+of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages. The code below
+installs all packages for the analysis.
 
 ```{r  install-required, eval = FALSE, results = "hide" }
 source("https://bioconductor.org/biocLite.R")
@@ -103,20 +106,20 @@ if (packageVersion("xcms") < "3.3.1")
 
 ## Data import and representation
 
-Below we load all required libraries and read our toy data using the `readMSData`
-function. This data set consists of two files in mzML format, with signals from
-pooled human serum samples measured with a ultra high performance liquid
-chromatography (UHPLC) system (Agilent 1290) coupled with a Q-TOF MS (TripleTOF
-5600+ AB Sciex). Chromatographic separation based on hydrophilic interaction
-liquid chromatography (HILIC). The system was tuned to allow measurement of the
-*polar metabolome*. To reduce file sizes, the data set was restricted to an m/z
-range from 105 to 134 and retention times from 0 to 260 seconds. We also define
-a `data.frame` describing the experiment and pass this to the `readMSData`
-function. We thus have all experiment-related information within the same data
-object. The option `mode = "onDisk"` tells the function to read only general
-metadata into memory. The m/z and intensity values from the original files are
-not kept in memory, but retrieved from the original files on demand. This
-enables analyses of very large experiments.
+In the code block below we load all required libraries and read our toy data
+using the `readMSData` function. This data set consists of two files in mzML
+format, with signals from pooled human serum samples measured with a ultra high
+performance liquid chromatography (UHPLC) system (Agilent 1290) coupled with a
+Q-TOF MS (TripleTOF 5600+ AB Sciex) instrument. Chromatographic separation based
+on hydrophilic interaction liquid chromatography (HILIC). The system was tuned
+to allow measurement of the *polar metabolome*. To reduce file sizes, the data set
+was restricted to an m/z range from 105 to 134 and retention times from 0 to 260
+seconds. We also define a `data.frame` describing the experiment and pass this to
+the `readMSData` function. We thus have all experiment-related information within
+the same data object. The option `mode = "onDisk"` tells the function to read only
+general metadata into memory. The m/z and intensity values from the original
+files are not kept in memory, but retrieved from the original files on
+demand. This enables analyses of very large experiments.
 
 ```{r  load-data, message = FALSE }
 library(MSnbase)
@@ -147,7 +150,7 @@ registerDoParallel(3)
 register(bpstart(DoparParam()), default = TRUE) 
 ```
 
-The experiment data is now represented as an `OnDiskMSnExp` object. Phenotype
+The experimental data is now represented by an `OnDiskMSnExp` object. Phenotype
 information can be retrieved with the `pData` function, or directly using `$`. Below
 we access sample descriptions.
 
@@ -197,19 +200,19 @@ lengths(rts)
 The `spectra` function can be used to retrieve the list of all spectra (from all
 files). This will load the full data from all raw files (eventually applying
 data manipulations stored in the lazy processing queue), which can take,
-depending on the size of the experiment, a relatively long time. In most cases
+depending on the size of the experiment, a relatively long time and requires,
+depending on the experiment, a considerable amount of memory. In most cases
 we will however work anyway with sub-sets of the data, and retrieving such data
 can, in the case of indexed mzML, mzXML and CDF files, be very fast. Data
 objects can be easily subsetted using the filter functions: `filterFile`,
 `filterRtime`, `filterMz` or `filterMsLevel` that filter the data by file, retention
 time range, m/z range or MS level. To illustrate this we retrieve below all
 spectra measured between 180 and 181 seconds. Note that we use the pipe operator
-`%>%` from the `magrittr` package for better readability by avoiding nested function
-calls.
+`%>%` from the `magrittr` package for better readability.
 
 ```{r  spectra-filterRt, message = FALSE }
 ## Get all spectra measured between 180 and 181 seconds
-## Use %>% for better readability
+## Use %>% to avoid nested function calls
 sps <- data %>%
     filterRt(rt = c(180, 181)) %>%
     spectra 
@@ -245,13 +248,13 @@ expected mass to charge ratio for the [M+H]+ adduct of Serine.
 
 MS data is in general organized by spectrum, but in LC-MS experiments we analyze
 the data along the retention time axis and hence orthogonally to this data
-representation. We can however use the `chromatogram` function to extract such
-data. The function aggregates intensities for each scan/retention time along the
-m/z axis (i.e. within each spectrum) and returns the retention time - intensity
-duplets in a `Chromatogram` object, one per file. The `Chromatogram` object
-supports, similar to the `Spectrum` object, the `rtime` and `intensity` functions to
-access the respective data. Below we use the `chromatogram` function to
-extract the total ion chromatogram (TIC) for each file and plot it.
+representation. To extract such data we can use the `chromatogram` function. The
+function aggregates intensities for each scan/retention time along the m/z axis
+(i.e. within each spectrum) and returns the retention time - intensity duplets
+in a `Chromatogram` object, one per file. The `Chromatogram` object supports,
+similar to the `Spectrum` object, the `rtime` and `intensity` functions to access the
+respective data. Below we use the `chromatogram` function to extract the total ion
+chromatogram (TIC) for each file and plot it.
 
 ```{r  chromatogram-tic, message = FALSE, fig.cap = "Total ion chromatogram.", fig.width = 10, fig.height = 5 }
 ## Get chromatographic data (TIC) for an m/z slice
@@ -263,9 +266,9 @@ plot(chr)
 ```
 
 The object returned by the `chromatogram` function arranges the individual
-`Chromatogram` objects of each file in a two-dimensional array, columns being
-samples (files) and rows data slices. Below we extract the (total ion)
-intensities from the TIC of the first file.
+`Chromatogram` objects in a two-dimensional array, columns being samples (files)
+and rows data slices. Below we extract the (total ion) intensities from the TIC
+of the first file.
 
 ```{r  chromatogram-tic-intensity, message = FALSE }
 ints <- intensity(chr[1, 1])
@@ -273,8 +276,8 @@ head(ints)
 ```
 
 The object contains also all phenotype information from the original `data`
-variable, that can be accessed similarly to the `OnDiskMSnExp` object (or most
-other data objects in Bioconductor).
+variable. This can be accessed in the same way than for `OnDiskMSnExp` objects
+(or most other data objects in Bioconductor).
 
 ```{r  chromatogram-pdata, message = FALSE }
 ## Access the full phenotype data
@@ -355,9 +358,9 @@ centroiding vignette in `MSnbase`.
 
 Note that, since the MS data is not loaded in memory, smoothing and centroiding
 is applied to the data *on-the-fly* each time that m/z or intensity values are
-requested from the data object `data_cent`. To make any data manipulations on an
-`OnDiskMSnExp` object *persistent* we need to export the data. Below we save thus
-the centroided data as mzML files and read the exported data again.
+requested from the data object `data_cent`. To make any data manipulation on an
+`OnDiskMSnExp` object *persistent* we need to export and re-read the data. Below we
+save thus the centroided data as mzML files and read the exported data again.
 
 ```{r  export-centroided-prepare, message = FALSE, echo = FALSE, warnings = FALSE, results = "hide" }
 ## Silently removing exported mzML files if they do already exist.
@@ -390,11 +393,11 @@ performed with the `findChromPeaks` function and one of different algorithms tha
 are selected depending on the submitted parameter object: with
 `MatchedFilterParam` it performs peak detection as described in the original xcms
 article [@Smith:2006ic]. With `CentWaveParam` a continuous wavelet
-transformation (CWT)-based peak detection is performed that can detect close-by and
-partially overlapping peaks with different widths [@Tautenhahn:2008fx]. With
-`MassifquantParam` it performs a Kalman filter-based peak detection
-[@Conley:2014ha]. Additional peak detection algorithms for direct injection
-data are also available, but not discussed here.
+transformation (CWT)-based peak detection is performed that can detect close-by
+and partially overlapping peaks with different widths
+[@Tautenhahn:2008fx]. With `MassifquantParam` it performs a Kalman
+filter-based peak detection [@Conley:2014ha]. Additional peak detection
+algorithms for direct injection data are also available, but not discussed here.
 
 We use the *centWave* algorithm that performs peak detection in two steps: first
 it identifies regions of interest in the m/z - retention time space and
@@ -402,11 +405,11 @@ subsequently detects peaks in these regions using a continuous wavelet transform
 (see the original publication for more details). centWave can be configured with
 several parameters (see `?CentWaveParam`), with the most important ones being
 `peakwidth` and `ppm`. `peakwidth` defines the minimal and maximal expected width of
-the peak in retention time dimension and depends thus on the LC settings of the
-experiment. Appropriate values for this parameter can be defined based on
-extracted ion chromatograms of known compounds. Below we extract chromatographic
-data for Serine and perform a peak detection on the `Chromatogram` object using
-the default parameters for centWave.
+the peak in retention time dimension and depends thus on the LC setting of the
+LC-MS system used to measure the data. Appropriate values for this parameter can
+be defined based on extracted ion chromatograms of known compounds. Below we
+extract chromatographic data for Serine and perform a peak detection on the
+`Chromatogram` object using the default parameters for centWave.
 
 ```{r  centWave-default, message = FALSE, fig.cap = "XIC for Serine", results = "hide" }
 ## Get the XIC for serine in the first file
@@ -424,8 +427,8 @@ cwp <- CentWaveParam()
 findChromPeaks(srn_chr, param = cwp) 
 ```
 
-The warning message tells us that centWave did not find any peaks in that
-chromatogram. Looking at the default values for the centWave parameters helps
+The warning message tells us that centWave failed to find any peak in the
+provided data. Looking at the default values for the centWave parameters helps
 understanding why the peak detection failed:
 
 ```{r  centWave-default-parameters, message = FALSE }
@@ -437,7 +440,7 @@ above it is apparent that the chromatographic peak for Serine is about 4 seconds
 wide. Below we adapt the settings to accommodate peaks ranging from 2 to 10
 seconds and re-run the peak detection. In general, it is advisable to
 investigate peak widths for several ions in the data set to determine the most
-appropriate settings for `peakwidth`.
+appropriate `peakwidth` setting.
 
 ```{r  centWave-adapted, message = FALSE, fig.cap = "XIC for Serine with detected chromatographic peak", results = "hide" }
 cwp <- CentWaveParam(peakwidth = c(2, 10))
@@ -449,13 +452,14 @@ plot(srn_chr)
 rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
 ```
 
-Another important parameter is `ppm`, used in the initial identification of the
-regions of interest that are then subject for the CWT-based peak detection. A
-*real* signal from an ion is expected to yield stable m/z values in consecutive
-scans (the scattering of the m/z values around the *real* m/z value of the ion is
-supposed to be inversely related with its intensity). In centWave, all data
-points that differ by less than `ppm` in consecutive spectra are combined into a
-region of interest. To illustrate this, we plot the full data for Serine.
+Another important parameter is `ppm` which is used in the initial identification
+of the regions of interest. In contrast to random noise, the *real* signal from an
+ion is expected to yield stable m/z values in consecutive scans (the scattering
+of the m/z values around the *real* m/z value of the ion is supposed to be
+inversely related with its intensity). In centWave, all data points that differ
+by less than `ppm` in consecutive spectra are combined into a region of interest
+that is then subject for the CWT-based peak detection. To illustrate this, we
+plot the full data for Serine.
 
 ```{r  Serine-mz-scattering-plot, message = FALSE }
 ## Restrict the data to signal from Sering
@@ -497,22 +501,23 @@ preprocessing results and, by extending the `OnDiskMSnExp` object, inherits all 
 its functionality that has bee described so far. The results from the peak
 detection analysis can be accessed with the `chromPeaks` function, that, with the
 optional `rt` and `mz` parameters, allows to extract identified chromatographic
-peaks from specific areas in the data.
+peaks from specific areas in the data. Below we extract all identified peaks
+for a certain m/z - rt area.
 
 ```{r  xcmsnexp, message = FALSE }
 ## Access the peak detection results from a specific m/z - rt area
 chromPeaks(data_cent, mz = c(106, 107), rt = c(150, 190)) 
 ```
 
-For each identified peak the m/z value of the apex is reported (column "mz"),
-the m/z range ("mzmin", "mzmax"), the retention time of the apex ("rt") and its
-range ("rtmin", "rtmax"), the integrated signal of the peak (i.e. the peak area
-"into"), the maximal signal of the peak ("maxo"), the signal to noise ratio
-("sn") and the index of the sample in which the peak was detected ("sample").
-For quality assessment we could now calculate summary statistics on the
-identified peaks to e.g. identify samples with much less detected peaks. Also,
-we can use the `plotChromPeaks` function to provide some general information on
-the location of the identified chromatographic peaks in the m/z - rt space.
+For each identified peak the m/z and rt value of the apex is reported (columns
+"mz" and "rt") as well as their ranges ("mzmin", "mzmax", "rtmin", "rtmax"), the
+integrated signal of the peak (i.e. the peak area "into"), the maximal signal of
+the peak ("maxo"), the signal to noise ratio ("sn") and the index of the sample
+in which the peak was detected ("sample").  For quality assessment we could now
+calculate summary statistics on the identified peaks to e.g. identify samples
+with much less detected peaks. Also, we can use the `plotChromPeaks` function to
+provide some general information on the location of the identified
+chromatographic peaks in the m/z - rt space.
 
 ```{r  plotChromPeaks, message = FALSE, fig.cap = "Location of the identified chromatographic peaks in the m/z - rt space." }
 par(mfrow = c(1, 2))
@@ -544,21 +549,20 @@ method. The settings for the algorithms can be defined with the `PeakGroupsParam
 and the `ObiwarpParam` parameter objects, respectively.
 
 For our example we use the peakGroups method that aligns samples based on the
-retention times of *hook peaks*, that are supposed to be present in most
-samples. For this approach we need to identify these hook peaks first, for which
-we employ the *peakDensity* correspondence analysis method. Details about this
-correspondence method and explanations on the choices for its parameters are
-provided in the next section. After having performed an initial correspondence
-analysis that defined features (i.e. grouped chromatographic peaks across
-samples), we perform the alignment using the settings `minFraction = 1` and `span =
-0.6`. `minFraction` defines the proportion of samples in which a feature has to be
+retention times of *hook peaks*, which are supposed to be present in most
+samples. Prior to alignment we have thus to identify these peaks, which is
+accomplished by the *peakDensity* correspondence analysis method. Details about
+this method and explanations on the choices of its parameters are provided in
+the next section. After having performed this initial correspondence, we perform
+the alignment using the settings `minFraction = 1` and `span = 0.6`. `minFraction`
+defines the proportion of samples in which a feature (i.e. peak group) has to be
 detected/present. A value of 0.9 would e.g. require that a chromatographic peak
 was detected in 90% of all samples of the experiment. Our data represents
 replicated measurements of the same sample pool and we can thus assume that for
-hook peaks a peak was identified in all files. The parameter `span` defines the
+hook peaks a peak was identified in each file. The parameter `span` defines the
 degree of smoothing of the loess function that is used to allow different
 regions along the retention time axis to be adjusted by a different factor. A
-value of 0 will most likely cause an overfitting, while 1 would perform a linear
+value of 0 will most likely cause overfitting, while 1 would perform a linear
 regression. Values between 0.4 and 0.6 seem to be reasonable for most
 experiments.
 
@@ -574,9 +578,9 @@ pgp <- PeakGroupsParam(minFraction = 1, span = 0.6)
 data_cent <- adjustRtime(data_cent, param = pgp) 
 ```
 
-Adjusted retention times are stored along with the raw retention times within
+Adjusted retention times are stored, along with the raw retention times, within
 the result object. Any function accessing retention times (such as `rtime`) will
-by default return adjusted retention times from an `XCMSnExp` object if
+by default return adjusted retention times from an `XCMSnExp` object, if
 present. Note that also the retention times of the identified chromatographic
 peaks are adjusted by the `adjustRtime` call. After alignment it is suggested to
 inspect the differences between raw and adjusted retention times.
@@ -588,10 +592,10 @@ plotAdjustedRtime(data_cent)
 
 The difference between raw and adjusted retention time should be reasonable. In
 our example it is mostly below one second which, which is OK since the samples
-were measured on the same day. Also, hook peaks should ideally be present along
-the full retention time range. In addition we plot the base peak chromatograms
-before and after alignment to get a general overview of the alignment
-performance.
+were measured within a short time period and differences are thus expected to be
+small. Also, hook peaks should ideally be present along the full retention time
+range. In addition we plot the base peak chromatograms before and after
+alignment to get a general overview of the alignment performance.
 
 ```{r  bpc-raw-adjusted, message = FALSE, fig.cap = "BPC before (top) and after (bottom) alignment.", fig.width = 10, fig.height = 8 }
 par(mfrow = c(2, 1))
@@ -602,7 +606,7 @@ plot(chromatogram(data_cent, aggregationFun = "max"))
 ```
 
 The base peak chromatograms are nicely aligned after retention time
-adjustment. The impact of the alignment should also be evaluated for known
+adjustment. The impact of the alignment should also be evaluated on known
 compounds. We thus below plot the XIC for Serine before and after alignment.
 
 ```{r  serine-xic-adjusted, message = FALSE, fig.cap = "XIC for Serine before (left) and after (right) alignment", fig.width = 10, fig.height = 4 }
@@ -631,11 +635,12 @@ configured by passing either a `PeakDensityParam` or a `NearestPeaksParam` objec
 the `groupChromPeaks` function. For our example we use the peak density method
 that iterates through slices of m/z ranges of the data and groups
 chromatographic peaks (within the same or in other samples) in each if they are
-close enough in their retention time which is estimated based on the
-distribution of peaks along the retention time. To illustrate this we extract
-below an m/z slice containing the Serine peak and use the `plotChromPeakDensity`
-function to visualize the distribution of peaks along the retention time axis
-and *simulate* a correspondence based on the provided settings. This function thus
+close enough in their retention time. Which peaks are grouped together is
+defined based on the distribution of peaks along the retention time that is
+estimated with the R `density` function. To illustrate this we extract below an
+m/z slice containing the Serine peak and use the `plotChromPeakDensity` function
+to visualize the distribution of peaks along the retention time axis and
+*simulate* a correspondence based on the provided settings. This function thus
 allows to test different settings for the correspondence on data subsets before
 applying them on the full data set.
 
@@ -656,11 +661,12 @@ plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
 ```
 
 The upper panel in the plot above shows the chromatographic data with the
-identified peaks. The lower panel shows the retention time of peaks (x-axis) per
-sample (y-axis) with the black solid line representing their distribution along
-the x-axis. Peak groups (features) are indicated with grey rectangles. The
-default settings could thus successfully group the Serine peak in each sample
-into a feature. The parameters for the peak density correspondence analysis are:
+identified peaks. The lower panel shows the retention time of identified peaks
+(x-axis) per sample (y-axis) with the black solid line representing their
+distribution along the x-axis. Peak groups (features) are indicated with grey
+rectangles. The default settings could thus successfully group the Serine peak
+in each sample into a feature. The parameters for the peak density
+correspondence analysis are:
 
 -   `binSize`: m/z width of the bin/slice of data in which peaks are grouped.
 -   `bw` defines the smoothness of the density function.
@@ -673,9 +679,9 @@ The parameters `minFraction` and `minSamples` depend on the experimental layout 
 should be set accordingly. `binSize` should be set to a small enough value that
 peaks from different ions measured at about the same retention time would not be
 grouped together. The most important parameter however is `bw` and, while its
-default of 30 was able to correctly group the Serine peaks, it should be
-evaluated also on other, potentially more difficult, compounds. We thus evaluate
-the performance of the default parameters on an m/z slice that contains also the
+default value of 30 was able to correctly group the Serine peaks, it should be
+evaluated also on other, more complicated, signals. We thus evaluate the
+performance of the default parameters on an m/z slice that contains also the
 isomers Betaine and Valine ([M+H]+ m/z 118.08625).
 
 ```{r  correspondence-bw, message = FALSE, fig.cap = "Define correspondence settings to separate Betaine and Valine peaks.", fig.width = 10, fig.height = 10 }
@@ -695,8 +701,8 @@ pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8)
 plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within") 
 ```
 
-While with default settings all peaks in the m/z slice were grouped into the
-same feature, reducing `bw` to 1.8 resulted in separate features for all
+While with default settings all peaks in the m/z slice were grouped into a
+single feature, reducing `bw` to 1.8 resulted in separate features for all
 isomers. Below we perform the correspondence using the data-set specific
 settings.
 
@@ -708,11 +714,11 @@ pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8,
 data_cent <- groupChromPeaks(data_cent, param = pdp) 
 ```
 
-The performance of the correspondence analysis should also be evaluated on some
-known compounds. We thus check the results for another m/z slice that contain
-the isomers Leucine and Isoleucine ([M+H]+ m/z 132.10191). Using
-`plotChromPeakDensity` with `simulate = FALSE` will show the actual results from the
-correspondence analysis.
+Correspondence analysis results should also be evaluated on some known
+compounds. We thus check the results for another m/z slice that contains isomers
+Leucine and Isoleucine ([M+H]+ m/z 132.10191). Setting `simulate = FALSE` in
+`plotChromPeakDensity` will show the actual results from the correspondence
+analysis.
 
 ```{r  correspondence-evaluate, message = FALSE, fig.cap = "Result of correspondence on a slice containing the isomers Leucine and Isoleucine.", fig.width = 10, fig.heigt = 8 }
 par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
@@ -774,13 +780,14 @@ sample. With the `fillChromPeaks` function, `xcms` provides the functionality to
 rt and m/z of all peaks assigned to the feature). Several settings allow to
 increase this feature region in m/z and/or retention time dimension: `expandMz`
 and `expandRt` expand the region relative to the width of the area in either m/z
-or rt dimension. `expandMz` would for expand the region by half of each feaature's
-width on both sides hence resulting in a region twice the size of the original
-feature in m/z. Finally, `ppm` allows to expand the m/z width of each region by an
-m/z dependent value. Note that in future the function will gain two more
-settings `fixedMz` and `fixedRt` to enable expansion of the feature area also by a
-constant value. Below we first determine the number of missing values in the
-data matrix and subsequently use `fillChromPeaks` to fill-in some missing peaks.
+or rt dimension. `expandMz = 1` would for example expand the regions by half of
+each feature's m/z width on both sides hence resulting in regions with an m/z
+width twice as big as their original width. Finally, `ppm` allows to expand the
+m/z width of each region by an m/z dependent value. Note that in future the
+function will gain two more settings `fixedMz` and `fixedRt` to enable expansion of
+the feature area also by a constant value. Below we first determine the number
+of missing values in the data matrix and subsequently use `fillChromPeaks` to
+fill-in some missing peaks.
 
 ```{r  fillChromPeaks, message = FALSE }
 ## Number of missing values
