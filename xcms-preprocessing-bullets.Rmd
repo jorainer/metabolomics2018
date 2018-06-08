@@ -316,9 +316,9 @@ data_cent <- readMSData(fls_new, pdata = new("NAnnotatedDataFrame", pd),
 - Aim: identify chromatographic peaks in the data.
 - Function: `findChromPeaks`.
 - Available methods:
-  - *matchedFilter* (`MatchedFilterParam`) [@Smith:2006ic].
-  - *centWave* (`CentWaveParam`) [@Tautenhahn:2008fx].
-  - *massifquant* (`MassifquantParam`) [@Conley:2014ha].
+  - *matchedFilter* (`MatchedFilterParam`) [Smith Anal. chem. 2006].
+  - *centWave* (`CentWaveParam`) [Tautenhahn BMC Bioinformatics 2008].
+  - *massifquant* (`MassifquantParam`) [Conley Bioinformatics 2014].
 
 **centWave**:
 1) identify regions of interest.
@@ -448,10 +448,10 @@ plot(bpc_raw)
 
 - Function: `adjustRtime`.
 - Available methods:
-  - *peakGroups* (`PeakGroupsParam`) [@Smith:2006ic]: align samples 
-    based on hook peaks.
-  - *obiwarp* (`ObiwarpParam`) [@Prince:2006jj]: warps the (full) 
-    data to a reference sample.
+  - *peakGroups* (`PeakGroupsParam`) [Smith Anal. chem. 2006]: align
+    samples based on hook peaks.
+  - *obiwarp* (`ObiwarpParam`) [Prince Anal. chem. 2006]: warps the 
+    (full) data to a reference sample.
 
 - peakGroups works reasonably well in most cases.
 - Need to define the hook peaks first: peaks present in most/all samples.
@@ -525,8 +525,8 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 - Aim: group signal (peaks) from the same ion across samples.
 - Function: `groupChromPeaks`.
 - Methods available:
-  - *peak density* (`PeakDensityParam`) [@Smith:2006ic].
-  - *nearest* (`NearestPeaksParam`) [@Katajamaa:2006jh].
+  - *peak density* (`PeakDensityParam`) [Smith Anal. chem. 2006].
+  - *nearest* (`NearestPeaksParam`) [Katajamaa Bioinformatics 2006].
 
 - peak density: 
   - iterates through slices of m/z ranges and groups chromatographic 
