@@ -442,7 +442,7 @@ head(chromPeaks(data_cent))
 ## Extract base peak chromatograms
 bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
 par(mfrow = c(1, 1))
-plot(bpc_raw) 
+plot(bpc_raw)
 ```
 
 

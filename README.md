@@ -46,6 +46,11 @@ if (packageVersion("xcms") < "3.3.1")
   complete R code and expanded description. Can be converted to a html file with
   `rmarkdown::render("xcms-preprocessing.Rmd")`.
 
+- [xcms-preprocessing-ioslides.Rmd](./xcms-preprocessing-ioslides.Rmd): R
+  markdown file that is rendered (with
+  `rmarkdown::render("xcms-preprocessing-ioslides.Rmd")` into the html
+  presentation for the conference.
+
 - [xcms-preprocessing-bullets.Rmd](./xcms-preprocessing-bullets.Rmd): file with
   complete R code but strongly reduced descriptive content (in form of bullet
   points). This file is used for the interactive presentation in RStudio.

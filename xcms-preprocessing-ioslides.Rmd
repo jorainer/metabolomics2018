@@ -1,0 +1,982 @@
+---
+title: "Metabolomics data pre-processing using xcms"
+author: "Johannes Rainer<br>Eurac Research, Bolzano, Italy<br>johannes.rainer@eurac.edu github/twitter: jotsetung"
+date: "24 June 2018"
+output: 
+  ioslides_presentation:
+    widescreen: true
+    fig_width: 7
+    fig_height: 5
+    fig_retina: 2
+    fig_caption: false
+    transition: faster
+    css: jostyle.css
+---
+
+<style type="text/css">
+
+slides > slide:not(.nobackground):after {
+  content: '';
+}
+
+slides > slide {
+    -webkit-transition:none !important;transition:none !important;
+}
+
+.build > * {
+  -webkit-transition: opacity 0.1s ease-in-out;
+  -webkit-transition-delay: 0.1s;
+  -moz-transition: opacity 0.1s ease-in-out 0.1s;
+  -o-transition: opacity 0.1s ease-in-out 0.1s;
+  transition: opacity 0.1s ease-in-out 0.1s;
+}
+
+</style>
+
+<!-- 
+For options, settings etc see:
+https://rmarkdown.rstudio.com/ioslides_presentation_format.html
+https://bookdown.org/yihui/rmarkdown/ioslides-presentation.html#adding-a-logo
+
+    css: style.css
+
+
+f fullscreen
+command + increase size (zoom)
+w toggle widescreen
+o enable overview
+h enable code highlight
+-->
+
+## Content {.build}
+
+The workflow is focused on the **new** `xcms` interface/functions and covers:
+
+<div>
+- Basic MS data handling (`MSnbase`)
+- Simple MS data centroiding (`MSnbase`)
+- LC-MS data pre-processing (`xcms`):
+  - chromatographic peak detection
+  - alignment
+  - correspondence
+</div>
+<div>
+- Not covered:
+  - data normalization
+  - compound identification
+  - differential abundance analysis
+</div>
+
+## Prerequisites {.build}
+
+<div>
+- R version >= 3.5.0
+- Libraries:
+
+```{r eval = FALSE, results = "hide", message = FALSE}
+source("https://bioconductor.org/biocLite.R")
+biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr",
+	   "devtools"))
+## Need xcms version > 3.3.1
+if (packageVersion("xcms") < "3.3.1")
+    devtools::install_github("sneumann/xcms", ref = "master") 
+```
+</div>
+<div>
+- `git clone https://github.com/jotsetung/metabolomics2018`
+- Open *xcms-preprocessing.Rmd* in e.g. RStudio.
+</div>
+
+
+## Background
+
+- `xcms` part of Bioconductor since 2006, *standard* toolbox for LC/GC-MS data
+  preprocessing.
+- Major changes in `xcms` version > 3:
+  - re-use data structures from Bioconductor's `MSnbase` package
+  - native MSn support
+  - new functions simplifying raw data access
+  - internal changes and code cleanup
+
+
+<!-- ## Definitions and common naming convention -->
+
+<!-- - **chromatographic peak**: signal from an ion along retention time dimension. -->
+<!-- - **chromatographic peak detection**: process in which chromatographic peaks are -->
+<!--   identified within each file. -->
+<!-- - **alignment**: process that adjusts retention time differences between files. -->
+<!-- - **correspondence**: grouping of chromatographic peaks (presumably from the -->
+<!--   same ion) across files. -->
+<!-- - **feature**: chromatographic peaks grouped across samples. -->
+
+
+# Workflow
+
+## Data import and representation {.build}
+
+- Load libraries and setup parallel processing
+
+```{r load-libs, message = FALSE, results = "hide"}
+library(xcms)
+library(magrittr)
+## Set up parallel processing using 3 cores
+library(doParallel)
+registerDoParallel(3)
+register(bpstart(DoparParam()), default = TRUE) 
+```
+
+<div>
+- Read data from mzML/mzXML/CDF files with `readMSData` function.
+- `mode = "onDisk"`: reads only spectrum header from files, but no data.
+- *on-disk* mode enables analysis of very large experiments.
+</div>
+
+## {.build}
+
+<div>
+- Example: read the toy data set:
+  - subset from 2 files with pooled serum samples
+  - UHPLC (Agilent 1290) coupled with Q-TOF MS (TripleTOF 5600+ AB Sciex)
+  - HILIC-based chromatographic separation
+</div>
+<div>
+```{r load-data, message = FALSE }
+fls <- dir(system.file("sciex", package = "msdata"), full.names = TRUE)
+
+## Define a data.frame with additional information on the files.
+pd <- data.frame(file = basename(fls), injection_idx = c(1, 19),
+                 sample = c("POOL_1", "POOL_2"), group = "POOL")
+## Read the data
+data <- readMSData(fls, pdata = new("NAnnotatedDataFrame", pd), 
+                   mode = "onDisk") 
+```
+</div>
+
+
+## {.build}
+
+- `data` is an `OnDiskMSnExp`; access phenotype information using `pData`
+  or `$`, general spectrum information using `fData`.
+
+<div>
+- Example: get to know the `OnDiskMSnExp` object.
+```{r show-fData, message = FALSE}
+## Access phenotype information
+pData(data)
+```
+</div>
+<div>
+```{r show-fData2, message = FALSE}
+## Or individual columns directly using the $ operator
+data$injection_idx
+```
+
+</div>
+
+
+## Basic data access and visualization {.build}
+
+<div>
+- MS data in `OnDiskMSnExp`s is organized by spectrum (similarly to 
+  mzML files).
+</div>
+<div>
+- Access general spectrum information with `msLevel`, `centroided`, 
+  `rtime`, `polarity`.
+- Example: access general spectrum information.
+```{r  general-access, message = FALSE }
+## Get the retention time
+head(rtime(data))
+
+```
+</div>
+<div>
+- Use `fromFile` to know which values belong to which file/sample.
+- `Spectrum` object: container for m/z and intensity values.
+</div>
+
+----
+
+- `spectra` gets the list of all spectra (from all files). Can be slow
+  because full data is read *on-the-fly* from the files.
+- In most cases we work with subsets anyway: use filter functions to 
+  subset the data:
+  - `filterFile` subset to individual files/samples.
+  - `filterRtime` restrict to specific retention time window.
+  - `filterMz` restrict to m/z range.
+  - `filterMsLevel` subset to certain MS level(s).
+- Data access will be fast on indexed mzML, mzXML and CDF files.
+
+## {.build}
+
+- Example: extract all spectra measured between 180 and 181
+  seconds. Using the `%>%` (pipe) operator to avoid nested function calls.
+
+```{r spectra-filterRt, message = FALSE }
+## Get all spectra measured between 180 and 181 seconds
+## Use %>% for better readability
+sps <- data %>%
+    filterRt(rt = c(180, 181)) %>%
+    spectra
+```
+```{r spectra-filterRt-length}
+## How many spectra?
+length(sps)
+```
+```{r spectra-filterRt-sapply}
+## From which file?
+sapply(sps, fromFile) 
+```
+
+----
+
+- Example: plot the data from the last spectrum
+
+```{r spectrum-plot, message = FALSE, fig.width = 5, fig.height = 3.5}
+plot(sps[[6]]) 
+```
+
+- Spectra: intensities along the m/z dimension for discrete retention times.
+
+
+## {.smaller .build}
+
+<div>
+- `chromatogram`: extract chromatographic data (intensities along retention time
+  for a certain m/z range).
+</div>
+<div>
+- Example: get the total ion chromatogram for each file.
+
+```{r chromatogram, message = FALSE, fig.width = 7.5, fig.height = 4 }
+chr <- chromatogram(data)
+
+## Plot the tic
+plot(chr) 
+```
+</div>
+
+## {.smaller .build}
+
+<div>
+- `aggregationFun` parameter allows to switch from TIC `"sum"` to BPC `"max"`.
+</div>
+<div>
+- Example: extract ion chromatogram for Serine (m/z of [M+H]+ adduct 106.0455).
+
+```{r serine-xic, message = FALSE, fig.height = 4, fig.width = 7.5}
+data %>%
+    filterRt(rt = c(175, 189)) %>%
+    filterMz(mz = c(106.02, 106.07)) %>%
+    chromatogram(aggregationFun = "max") %>%
+    plot()
+```
+</div>
+
+## Summarizing
+
+- `MSnbase` + `xcms`: simplified data access.
+- `spectra` to get intensities along m/z for discrete retention time.
+- `chromatogram` to get intensities along rt for m/z range.
+- Use `rtime`, `mz`, `intensity` to access the MS values.
+
+
+## Centroiding of profile MS data {.build .faster}
+
+<div>
+- *centroiding* is the process in which mass peaks are reduced to a
+  single, representative signal, their centroids.
+- `xcms`, specifically *centWave* was designed for centroided data.
+- Proper centroiding can improve data accuracy.
+- `MSnase` provides basic tools to perform MS data smoothing and 
+  centroiding: `smooth` and `pickPeaks`.
+</div>
+<div>
+- Example: show the combined m/z, rt and intensity data for 
+  Serine.
+
+```{r serine-profile-mode-data, message = FALSE, eval = FALSE}
+## Filter the MS data to the signal from the Serine ion and plot it using
+## type = "XIC"
+data %>%
+    filterRt(rt = c(175, 189)) %>%
+    filterMz(mz = c(106.02, 106.07)) %>%
+    plot(type = "XIC") 
+```
+</div>
+
+## {.flexbox .vcenter}
+
+```{r serine-profile-mode-data2, message = FALSE, echo = FALSE}
+## Filter the MS data to the signal from the Serine ion and plot it using
+## type = "XIC"
+data %>%
+    filterRt(rt = c(175, 189)) %>%
+    filterMz(mz = c(106.02, 106.07)) %>%
+    plot(type = "XIC") 
+```
+
+- plot `type = "XIC"` creates a combined chromatographic and *map* 
+  visualization of the data.
+  
+## {.build}
+
+<div>
+- Example: smooth data in m/z dimension with Savitzky-Golay 
+  filter followed by a centroiding that simply reports the maximum 
+  signal for each mass peak in each spectrum. See `?pickPeaks` for 
+  more advanced options.
+
+```{r centroiding, message = FALSE, warning = FALSE, eval = FALSE}
+## Smooth the signal, then do a simple peak picking.
+data_cent <- data %>%
+    smooth(method = "SavitzkyGolay", halfWindowSize = 6) %>%
+    pickPeaks()
+```
+</div>
+<div>
+```{r, eval = FALSE}
+## Plot the centroided data for Serine
+data_cent %>%
+    filterRt(rt = c(175, 189)) %>%
+    filterMz(mz = c(106.02, 106.07)) %>%
+    plot(type = "XIC") 
+```
+</div>
+
+----
+
+```{r centroiding2, message = FALSE, warning = FALSE, fig.width = 10, fig.height = 5, echo = FALSE}
+## Smooth the signal, then do a simple peak picking.
+data_cent <- data %>%
+    smooth(method = "SavitzkyGolay", halfWindowSize = 6) %>%
+    pickPeaks()
+
+## Plot the centroided data for Serine
+data_cent %>%
+    filterRt(rt = c(175, 189)) %>%
+    filterMz(mz = c(106.02, 106.07)) %>%
+    plot(type = "XIC") 
+```
+
+----
+
+- Note: data smoothing and centroiding is applied to the data 
+  *on-the-fly* each time m/z or intensity values are accessed.
+- Example: export the smoothed data to new files and re-read 
+  the data.
+
+```{r remove-exported, message = FALSE, echo = FALSE, results = "hide"}
+lapply(basename(fileNames(data)), function (z) {
+    if (file.exists(z))
+        file.remove(z)
+})
+```
+
+```{r export-centroided, message = FALSE, warning = FALSE }
+## Write the centroided data to files with the same names in the current
+## directory
+fls_new <- basename(fileNames(data))
+writeMSData(data_cent, file = fls_new)
+
+## Read the centroided data.
+data_cent <- readMSData(fls_new, pdata = new("NAnnotatedDataFrame", pd),
+			mode = "onDisk") 
+```
+
+
+# LC-MS data preprocessing
+
+
+## Chromatographic peak detection {.build}
+
+
+- Aim: identify chromatographic peaks in the data.
+
+<div>
+- Function: `findChromPeaks`.
+</div>
+<div>
+- Available methods:
+  - *matchedFilter* (`MatchedFilterParam`) [Smith *Anal. chem.* 2006].
+  - *centWave* (`CentWaveParam`) [Tautenhahn *BMC Bioinformatics* 2008].
+  - *massifquant* (`MassifquantParam` [Conley *Bioinformatics* 2014].
+</div>
+
+## | centWave
+
+- First step: identify regions of interest.
+
+```{r out.width="600px", echo = FALSE}
+knitr::include_graphics("images/centWave-ROI.png")
+```
+
+
+----
+
+- 2nd: peak detection in these regions using continuous wavelet transform.
+
+```{r out.width="600px", echo = FALSE}
+knitr::include_graphics("images/centWave-CWT.png")
+```
+
+## {.smaller .build}
+
+- centWave parameters: `?CentWaveParam`, crucial: `peakwidth`, `ppm`.
+
+- `peakwidth`: minimal and maximal expected peak width.
+
+<div>
+- Example: extract chromatographic data for Serine.
+
+```{r centWave-default, message = FALSE, results = "hide", fig.height = 3.5, fig.width = 5 }
+## Get the XIC for serine in the first file
+srn_chr <- chromatogram(data_cent, rt = c(165, 200),
+                        mz = c(106.03, 106.06),
+                        aggregationFun = "max")[1, 1]
+plot(srn_chr)
+```
+</div>
+
+## {.build}
+
+<div>
+- Example: perform peak detection using default centWave parameters.
+
+```{r centWave-default2, message = FALSE}
+cwp <- CentWaveParam()
+findChromPeaks(srn_chr, param = cwp)
+```
+</div>
+
+<div>
+
+- What went wrong? Default for `peakwidth` does not match the current 
+  data.
+  
+```{r centWave-default3, message = FALSE}
+peakwidth(cwp)
+```
+</div>
+  
+## {.smaller .build}
+
+- Example: change `peakwidth` and run again.
+
+```{r centWave-adapted, message = FALSE, fig.height = 3.5, width = 5}
+cwp <- CentWaveParam(peakwidth = c(2, 10))
+pks <- findChromPeaks(srn_chr, param = cwp)
+## Plot the data and higlight identified peak area
+plot(srn_chr)
+rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
+```
+
+- Ideally check settings on more known compounds.
+
+## {.smaller .build}
+
+- `ppm`: maximal allowed scattering of m/z values for one ion.
+
+- Example: evaluate the m/z scattering of the signal for Serine.
+
+```{r Serine-mz-scattering-plot, message = FALSE, fig.height = 3.5, width = 5 }
+## Restrict the data to signal from Sering
+srn <- data_cent %>%
+    filterRt(rt = c(179, 186)) %>%
+    filterMz(mz = c(106.04, 106.06))
+
+## Plot the data
+plot(srn, type = "XIC") 
+```
+
+## {.build}
+
+- Example: calculate the difference in m/z values between 
+  consecutive scans.
+
+```{r define-ppm, message = FALSE }
+## Extract the Serine data for one file as a data.frame
+srn_df <- as(filterFile(srn, 1), "data.frame")
+## The difference between m/z values from consecutive scans in ppm
+diff(srn_df$mz) * 1e6 / mean(srn_df$mz) 
+```
+
+- This should also be performed ideally on more compounds.
+- `ppm` should be large enough to capture the full chromatographic peak.
+
+
+## {.build}
+
+<div>
+- Example: perform chromatographic peak detection based on derived settings.
+
+```{r findPeaks-centWave, message = FALSE }
+## Perform peak detection
+cwp <- CentWaveParam(peakwidth = c(2, 10), ppm = 30)
+data_cent <- findChromPeaks(data_cent, param = cwp) 
+```
+</div>
+<div>
+- Result: `XCMSnExp` object extends the `OnDiskMSnExp`, contains preprocessing
+  results *and* enables data access as described above.  </div>
+
+## {.smaller .build}
+
+- Example: access the peak detection results. 
+
+```{r  xcmsnexp, message = FALSE}
+## Access the peak detection results
+head(chromPeaks(data_cent)) 
+```
+
+- For quality assessment, we could also do some summary statistics on 
+  the identified peaks.
+- `plotChromPeaks` function to plot the location of the identified peak in m/z -
+  rt space.
+  
+
+## Alignment {.build}
+
+- Aim: adjust shifts in retention times between samples.
+- Example: plot the base peak chromatograms of all files.
+```{r alignment-bpc-raw, message = FALSE, fig.width = 8, fig.height = 3.5 , eval = FALSE}
+## Extract base peak chromatograms
+bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
+plot(bpc_raw)
+```
+
+```{r alignment-bpc-raw-plot, message = FALSE, fig.width = 8, fig.height = 3.5, echo = FALSE }
+## Extract base peak chromatograms
+par(mar = c(4, 4.5, 1, 0.5))
+bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
+plot(bpc_raw)
+```
+
+----
+
+- Function: `adjustRtime`.
+- Available methods:
+  - *peakGroups* (`PeakGroupsParam`) [Smith *Anal. chem.* 2006]: align samples 
+    based on *hook* peaks.
+  - *obiwarp* (`ObiwarpParam`) [Prince *Anal. chem.* 2006]: warps the (full) 
+    data to a reference sample.
+
+## | peakGroups {.build}
+
+<div>
+- peakGroups works reasonably well in most cases.
+</div>
+<div>
+- Need to define the hook peaks first: peaks present in most/all samples.
+</div>
+<div>
+- Important parameters:
+  - `minFraction`: proportion of samples in which a feature has to be 
+    present (0.9 for present in 90% of samples).
+  - `span`: degree of smoothing for the loess function, 0 likely 
+    overfitting, 1 linear regression. Values between 0.4 and 0.6 seem
+	reasonable.
+</div>
+
+## {.build}
+
+- Example: perform a peak grouping to define potential hook peaks and align the
+  samples based on these.
+- *Note:* details on initial peak grouping provided in the next section.
+
+```{r alignment-correspondence, message = FALSE }
+## Define the settings for the initial peak grouping
+pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8,
+                        minFraction = 1, binSize = 0.02)
+data_cent <- groupChromPeaks(data_cent, pdp)
+
+```
+
+```{r alignment-correspondence-alignment, message = FALSE}
+## Define settings for the alignment
+pgp <- PeakGroupsParam(minFraction = 1, span = 0.6)
+data_cent <- adjustRtime(data_cent, param = pgp)
+```
+
+## {.build}
+
+<div>
+- Adjusted retention times are stored in the object.
+</div>
+<div>
+- After alignment, evaluate results:
+  - difference between raw and adjusted retention time reasonable.
+  - hook peaks along the full retention time range.
+  - comparison of BPC (TIC) before/after alignment.
+  - evaluate data for known compounds.
+</div>
+<div>
+- Remove alignment results with `dropAdjustedRtime` and re-run if not happy.
+</div>
+
+## {.build}
+
+- Example: inspect difference between raw and adjusted retention times.
+
+```{r alignment-result, message = FALSE, fig.width = 8, fig.height = 4 }
+## Plot the difference between raw and adjusted retention times
+plotAdjustedRtime(data_cent) 
+```
+
+
+## {.build}
+
+- Example: plot BPC before and after alignment.
+```{r bpc-raw-adjusted, message = FALSE, eval = FALSE }
+par(mfrow = c(2, 1))
+## Plot the raw base peak chromatogram
+plot(bpc_raw)
+## Plot the BPC after alignment
+plot(chromatogram(data_cent, aggregationFun = "max")) 
+```
+
+----
+
+```{r bpc-raw-adjusted-plot, message = FALSE, echo = FALSE, fig.width = 7, fig.height = 6 }
+par(mfrow = c(2, 1), mar = c(4, 4.5, 1, 0.5))
+## Plot the raw base peak chromatogram
+plot(bpc_raw)
+## Plot the BPC after alignment
+plot(chromatogram(data_cent, aggregationFun = "max")) 
+```
+
+## {.build}
+
+- Example: plot Serine XIC before and after alignment.
+```{r serine-xic-adjusted, message = FALSE, fig.cap = "XIC for Serine before (left) and after (right) alignment", fig.width = 8, fig.height = 3.5 }
+## Use adjustedRtime parameter to access raw/adjusted retention times
+par(mfrow = c(1, 2), mar = c(4, 4.5, 1, 0.5))
+plot(chromatogram(data_cent, mz = c(106.04, 106.06),
+                  rt = c(179, 186), adjustedRtime = FALSE))
+plot(chromatogram(data_cent, mz = c(106.04, 106.06),
+                  rt = c(179, 186))) 
+```
+
+
+
+## Correspondence {.build}
+
+<div>
+- Aim: group signal (peaks) from the same ion across samples.
+</div>
+
+<div>
+- Function: `groupChromPeaks`.
+- Methods available:
+  - *peak density* (`PeakDensityParam`) [Smith *Anal. chem.* 2006].
+  - *nearest* (`NearestPeaksParam`) [Katajamaa *Bioinformatics* 2006].
+</div>
+
+
+## | peak density {.build}
+
+- Iterates through slices of m/z ranges and groups chromatographic in each if
+  peaks (from same or different samples) are close in retention time.
+- Whether they are close is estimated on the distribution of peaks along the
+  retention time.
+	
+---- 
+
+- Example: 
+  - Plot data for the m/z slice containing the Serine peak.
+  - Use `plotChromPeakDensity` to *dry-run* a correspondence analysis in the
+    same slice.
+
+```{r correspondence-example, message = FALSE, eval = FALSE}
+## Plot the BPC for the m/z slice containing serine
+par(mfrow = c(2, 1), mar = c(4, 4.3, 1, 0.5))
+plot(chromatogram(data_cent, mz = c(106.04, 106.06), aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = c(106.04, 106.06),
+                    whichPeaks = "apex_within")
+
+## Get default parameters for the grouping
+pdp <- PeakDensityParam(sampleGroups = data_cent$group)
+
+## Dry-run correspondence and show the results.
+plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
+                     type = "apex_within", param = pdp)
+ 
+```
+
+## {.smaller}
+
+```{r correspondence-example-plot, message = FALSE, width = 7, height = 5, echo = FALSE}
+## Plot the BPC for the m/z slice containing serine
+par(mfrow = c(2, 1), mar = c(4, 4.3, 1, 0.5))
+plot(chromatogram(data_cent, mz = c(106.04, 106.06), aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = c(106.04, 106.06),
+                    whichPeaks = "apex_within")
+
+## Get default parameters for the grouping
+pdp <- PeakDensityParam(sampleGroups = data_cent$group)
+
+## Dry-run correspondence and show the results.
+plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
+                     type = "apex_within", param = pdp)
+ 
+```
+
+- Points are peaks per sample;
+- black line: peak density distribution;
+- grey rectangles: grouped peaks (features).
+
+
+##
+
+- Parameters:
+  - `binSize`: m/z width of the data slice in which peaks are grouped.
+  - `bw` defines the smoothness of the density function.
+  - `maxFeatures`: maximum number of features to be defined in one bin.
+  - `minFraction`: minimum proportion of samples (of one group!) for 
+    which a peak has to be present.
+  - `minSamples`: minimum number of samples a peak has to be present.
+
+
+> - Parameters `minFraction` and `minSamples` depend on experimental layout!
+
+
+> - `binSize` should be small enough to avoid peaks from different ions 
+    measured at the similar retention time to be grouped together.
+
+> - `bw` is the most important parameter.
+
+##
+
+- Example: test default settings for a slice containing ions with similar m/z
+  and rt: isomers Betaine and Valine ([M+H]+ m/z 118.08625).
+
+```{r correspondence-bw, message = FALSE, eval = FALSE}
+par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
+## Plot the chromatogram for an m/z slice containing Betaine and Valine
+mzr <- 118.08625 + c(-0.01, 0.01)
+plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
+
+## Correspondence in that slice using default settings
+pdp <- PeakDensityParam(sampleGroups = data_cent$group)
+plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
+
+```
+
+##
+
+```{r correspondence-bw-plot, message = FALSE, width = 7, height = 5, echo = FALSE}
+par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
+## Plot the chromatogram for an m/z slice containing Betaine and Valine
+mzr <- 118.08625 + c(-0.01, 0.01)
+plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
+
+## Correspondence in that slice using default settings
+pdp <- PeakDensityParam(sampleGroups = data_cent$group)
+plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
+
+```
+
+> - **Correspondence failed**: all peaks grouped into one feature!
+> - Default for `bw` (`30`) too large for present data set.
+
+##
+
+- Test different `bw` (`1.8`) on the same slice.
+
+```{r correspondence-bw2, message = FALSE, eval = FALSE}
+par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
+## Plot the chromatogram for an m/z slice containing Betaine and Valine
+mzr <- 118.08625 + c(-0.01, 0.01)
+plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
+
+## Reducing the bandwidth
+pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8)
+plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within") 
+```
+
+
+##
+
+```{r correspondence-bw2-plot, message = FALSE, fig.width = 7, fig.height = 5, echo = FALSE}
+par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
+## Plot the chromatogram for an m/z slice containing Betaine and Valine
+mzr <- 118.08625 + c(-0.01, 0.01)
+plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
+
+## Reducing the bandwidth
+pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8)
+plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within") 
+```
+
+> - Reducing the `bw` enabled grouping of isomers into different
+    features.
+
+
+##
+
+- Perform the correspondence analysis with the derived settings.
+
+```{r  correspondence-analysis, message = FALSE}
+pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8,
+                        minFraction = 0.4, binSize = 0.02)
+
+## Perform the correspondence analysis
+data_cent <- groupChromPeaks(data_cent, param = pdp) 
+```
+
+> - Correspondence results are stored within the `XCMSnExp` object. 
+
+
+##
+
+- Evaluate results after correspondence: check another slice with 
+  isomers: Leucine, Isoleucine ([M+H]+ m/z 132.10191). 
+- Setting `simulate = FALSE` shows the actual results from the correspondence.
+
+```{r correspondence-evaluate, message = FALSE, eval = FALSE}
+par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
+## Plot the chromatogram for an m/z slice containing Leucine and Isoleucine
+mzr <- 132.10191 + c(-0.01, 0.01)
+plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
+
+plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within",
+                     simulate = FALSE) 
+```
+
+##
+
+```{r correspondence-evaluate-plot, message = FALSE, fig.width = 7, fig.heigt = 5, echo = FALSE}
+par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
+## Plot the chromatogram for an m/z slice containing Leucine and Isoleucine
+mzr <- 132.10191 + c(-0.01, 0.01)
+plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
+highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
+
+plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within",
+                     simulate = FALSE) 
+```
+
+
+## {.build}
+
+- Use `featureDefinitions` to access definition of features.
+
+```{r correspondence-feature-values, message = FALSE}
+head(featureDefinitions(data_cent), n = 4)
+
+```
+
+## {.build}
+
+- Simple per-feature summary
+
+```{r}
+## Per-feature summary.
+head(featureSummary(data_cent))
+```
+
+## {.build}
+
+- Use `featureValues` to access the features' abundance estimates.
+
+```{r}
+## feature intensity matrix
+fmat <- featureValues(data_cent, value = "into", method = "maxint")
+head(fmat) 
+```
+
+- `featureValues` parameters:
+  - `value`: name of the column in `chromPeaks` that should be returned.
+  - `method`: for features with multiple peaks in one sample: from which
+    peak the should the value be returned?
+
+## Missing values {.build}
+
+<div>
+- Peak detection may have failed in one sample.
+- Ion is not present in a sample.
+</div>
+<div>
+- `fillChromPeaks` allows to *fill-in* signal for missing peaks from the
+  feature area (defined by the median rt and mz of all peaks assigned to the
+  feature).
+</div>
+<div>
+- `fillChromPeaks` Parameters:
+  - `expandMz`, `expandRt`: expands the region from which signal is integrated
+    in m/z or rt dimension. A value of 0 means no expansion, 1 means the region
+    is grown by half of the feature's m/z width on both sides.
+  - `ppm`: expand the m/z width by a m/z dependent value.
+</div>
+
+## {.build}
+
+- Example: evaluate number of missing peaks and use `fillChromPeaks` to retrieve
+  a signal for them from the raw files.
+
+```{r fillChromPeaks, message = FALSE }
+## Number of missing values
+sum(is.na(fmat))
+
+## Define the settings for the fill-in of missing peaks
+fpp <- FillChromPeaksParam(expandMz = 0.5, expandRt = 0.5, ppm = 20)
+data_cent <- fillChromPeaks(data_cent, param = fpp)
+
+## How many missing values after
+sum(is.na(featureValues(data_cent)))
+
+```
+
+----
+
+```{r}
+fmat_fld <- featureValues(data_cent, value = "into", method = "maxint")
+head(fmat_fld) 
+```
+
+> - Note: `dropFilledChromPeaks` removes filled-in peaks again.
+> - `featureValues` with `filled = FALSE` returns only data from *real*
+    (detected) peaks.
+
+## {.build}
+
+- `XCMSnExp` objects contain also the complete processing history
+  including parameter classes.
+
+```{r correspondence-result-object, message = FALSE }
+## Overview of the performed processings
+processHistory(data_cent)
+```
+
+## {.build}
+
+```{r}
+
+## Access the parameter class for a processing step
+processParam(processHistory(data_cent)[[1]]) 
+```
+
+
+## Summary {.build}
+
+<div>
+- The new data objects and functions are aimed to:
+  - simplify data access and inspection of results
+  - facilitate data set-dependent definition  of algorithm parameters.
+</div>
+<div>
+- More work to come for the analysis of chromatographic data (SRM/MRM)
+  and eventually for data normalization.
+</div>
+<div>
+- **Don't blindly use default parameters!**
+</div>
+<div>
+- For problems, bugs: `https://github.com/sneumann/xcms`.
+</div>
+
