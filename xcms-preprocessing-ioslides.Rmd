@@ -1,6 +1,6 @@
 ---
 title: "Metabolomics data pre-processing using xcms"
-author: "Johannes Rainer<br>Eurac Research, Bolzano, Italy<br>johannes.rainer@eurac.edu github/twitter: jotsetung"
+author: "Johannes Rainer<br><strong>Eurac Research</strong>, Bolzano, Italy<br>johannes.rainer@eurac.edu github/twitter: jotsetung"
 date: "24 June 2018"
 output: 
   ioslides_presentation:
@@ -46,6 +46,14 @@ command + increase size (zoom)
 w toggle widescreen
 o enable overview
 h enable code highlight
+
+
+Export to pdf:
+webshot function from webshot package.
+library(webshot)
+install_phantomjs()
+fn <- paste0("file://", normalizePath("xcms-preprocessing-ioslides.html"))
+webshot(fn, "xcms-preprocessing-ioslides.pdf", delay = 4, vwidth = 1024, vheight = 768)
 -->
 
 ## Content {.build}
@@ -980,3 +988,11 @@ processParam(processHistory(data_cent)[[1]])
 - For problems, bugs: `https://github.com/sneumann/xcms`.
 </div>
 
+
+## Acknowledgments
+
+> - Laurent Gatto (University of Cambridge, UK); `MSnbase`, `mzR`.
+
+> - Steffen Neumann (IPB Halle, Germany); `xcms`, `mzR`
+
+> - **YOU for your attention!**
