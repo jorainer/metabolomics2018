@@ -19,11 +19,6 @@ references:
     given: noname
 ---
 
-<!-- 
-NOTE: this document should not be edited manually, as it will be over-written
-by exporting the metabolomics-preprocessing.org file.
--->
-
 
 # Background
 
