@@ -127,7 +127,7 @@ the =readMSData= function. We thus have all experiment-related information withi
 the same data object. The option =mode = "onDisk"= tells the function to read only
 general metadata into memory. The m/z and intensity values from the original
 files are not kept in memory, but retrieved from the original files on
-demand. This enables analyses of very large experiments.
+demand. This enables analyses of also very large experiments.
 
 #+NAME: load-data
 #+BEGIN_SRC R :ravel message = FALSE
@@ -148,19 +148,19 @@ demand. This enables analyses of very large experiments.
 		     mode = "onDisk")
 #+END_SRC
 
-Next we set up the parallel processing. This ensures that all required cores are
+Next we set up parallel processing. This ensures that all required cores are
 registered and available from the beginning of the analysis. All data access and
 analysis functions of =xcms= and =MSnbase= are parallelized on a per-file basis and
 will use this setup by default.
 
 #+NAME: parallel-setup
 #+BEGIN_SRC R :ravel message = FALSE
-  ## Set up parallel processing using 3 cores
-  registerDoParallel(3)
+  ## Set up parallel processing using 2 cores
+  registerDoParallel(2)
   register(bpstart(DoparParam()), default = TRUE)
 #+END_SRC
 
-The experimental data is now represented by an =OnDiskMSnExp= object. Phenotype
+The MS experiment data is now represented as an =OnDiskMSnExp= object. Phenotype
 information can be retrieved with the =pData= function, or directly using =$=. Below
 we access sample descriptions.
 
@@ -173,18 +173,14 @@ we access sample descriptions.
   data$injection_idx
 #+END_SRC
 
-The general information on each spectrum in the experiment can be accessed with
-the =fData= function, that returns a =data.frame= with one row per spectrum.
+General information on each spectrum in the experiment can be accessed with the
+=fData= function, that returns a =data.frame= with one row per spectrum.
 
 #+NAME: show-fData
 #+BEGIN_SRC R :ravel message = FALSE
   ## Access spectrum header information
   head(fData(data))
 #+END_SRC
-
-Note that, since the data is not kept in memory, any data manipulations (such as
-spectrum smoothing) do not actually change the data, but are applied to the data
-on the fly (i.e. each time m/z or intensity values are accessed).
 
 ** Basic data access and visualization
 
@@ -210,17 +206,16 @@ below.
 #+END_SRC
 
 The =spectra= function can be used to retrieve the list of all spectra (from all
-files). This will load the full data from all raw files (eventually applying
-data manipulations stored in the lazy processing queue), which can take,
-depending on the size of the experiment, a relatively long time and requires,
-depending on the experiment, a considerable amount of memory. In most cases
-we will however work anyway with sub-sets of the data, and retrieving such data
-can, in the case of indexed mzML, mzXML and CDF files, be very fast. Data
-objects can be easily subsetted using the filter functions: =filterFile=,
-=filterRtime=, =filterMz= or =filterMsLevel= that filter the data by file, retention
-time range, m/z range or MS level. To illustrate this we retrieve below all
-spectra measured between 180 and 181 seconds. Note that we use the pipe operator
-=%>%= from the =magrittr= package for better readability.
+files). This will load the full data from all raw files, which can take,
+depending on the size of the files and number of spectra, a relatively long time
+and requires, depending on the experiment, a considerable amount of memory. In
+most cases we will however work anyway with sub-sets of the data, and retrieving
+such data can, in the case of indexed mzML, mzXML and CDF files, be very
+fast. Data objects can be easily subsetted using the filter functions:
+=filterFile=, =filterRtime=, =filterMz= or =filterMsLevel= that filter the data by file,
+retention time range, m/z range or MS level. To illustrate this we retrieve
+below all spectra measured between 180 and 181 seconds. Note that we use the
+pipe operator =%>%= from the =magrittr= package for better readability.
 
 #+NAME: spectra-filterRt
 #+BEGIN_SRC R :ravel message = FALSE
@@ -232,7 +227,7 @@ spectra measured between 180 and 181 seconds. Note that we use the pipe operator
 #+END_SRC
 
 The result is a =list= of =Spectrum= objects. Below we determine the number of
-spectra we've got.
+spectra we have got.
 
 #+NAME: spectra-filterRt-length
 #+BEGIN_SRC R :ravel message = FALSE
@@ -353,10 +348,10 @@ The plot shows all data points measured by the instrument. It clearly shows the
 mass peaks for Serine, that are represented by a distribution of signal in both
 retention time and m/z dimension.
 
-Next we first smooth the data in each spectrum using a Savitzky-Golay filter,
-which usually improves data quality by reducing noise, followed by centroiding
-the data with a simple peak-picking strategy that reports the maximum signal for
-each mass peak in each spectrum.
+Next we smooth the data in each spectrum using a Savitzky-Golay filter, which
+usually improves data quality by reducing noise. Subsequently we perform a
+centroiding analysis based on a simple peak-picking strategy that reports the
+maximum signal for each mass peak in each spectrum.
 
 #+NAME: centroiding
 #+BEGIN_SRC R :ravel message = FALSE, warning = FALSE, fig.cap = "Centroided data for Serine.", fig.width = 10, fig.height = 5, fig.pos = "h!", warning = FALSE
@@ -461,7 +456,7 @@ understanding why the peak detection failed:
 The default settings for =peakwidth= are 20 to 50 seconds, while from the plot
 above it is apparent that the chromatographic peak for Serine is about 4 seconds
 wide. Below we adapt the settings to accommodate peaks ranging from 2 to 10
-seconds and re-run the peak detection. In general, it is advisable to
+seconds and re-run the peak detection. In general, it is advised to
 investigate peak widths for several ions in the data set to determine the most
 appropriate =peakwidth= setting.
 
@@ -497,8 +492,8 @@ plot the full data for Serine.
 #+END_SRC
 
 As expected, higher intensity signals tend to scatter less in m/z dimension. We
-next calculate for this data subset the difference in m/z values between
-consecutive scans.
+next calculate the differences in m/z values between consecutive scans in this
+data subset.
 
 #+NAME: define-ppm
 #+BEGIN_SRC R :ravel message = FALSE
@@ -511,7 +506,7 @@ consecutive scans.
 #+END_SRC
 
 The difference in m/z values for the Serine data is thus between 0 and 27
-ppm. This should be evaluated for several compounds and should ideally be set to
+ppm. This should ideally be evaluated for several compounds and should be set to
 a value that allows to capture the full chromatographic peaks for most of the
 tested compounds. We can next perform the peak detection using our settings for
 the =ppm= and =peakwidth= parameters.
@@ -525,7 +520,7 @@ the =ppm= and =peakwidth= parameters.
 
 The result from the =findChromPeaks= call is an =XCMSnExp= object which contains all
 preprocessing results and, by extending the =OnDiskMSnExp= object, inherits all of
-its functionality that has bee described so far. The results from the peak
+its functionality that has been described so far. The results from the peak
 detection analysis can be accessed with the =chromPeaks= function, that, with the
 optional =rt= and =mz= parameters, allows to extract identified chromatographic
 peaks from specific areas in the data. Below we extract all identified peaks
@@ -572,8 +567,8 @@ files of our toy data set to visualize these differences.
 While both samples were measured with the same setup on the same day there are
 still differences observable in the BPCs above.
 
-Alignment can be performed in =xcms= with the =adjustRtime= function that supports
-the /peakGroups/ \cite{Smith:2006ic} and the /obiwarp/ \cite{Prince:2006jj}
+Alignment can be performed with =xcms= using the =adjustRtime= function that
+supports the /peakGroups/ \cite{Smith:2006ic} and the /obiwarp/ \cite{Prince:2006jj}
 method. The settings for the algorithms can be defined with the =PeakGroupsParam=
 and the =ObiwarpParam= parameter objects, respectively.
 
@@ -584,16 +579,16 @@ accomplished by the /peakDensity/ correspondence analysis method. Details about
 this method and explanations on the choices of its parameters are provided in
 the next section. After having performed this initial correspondence, we perform
 the alignment using the settings =minFraction = 1= and =span = 0.6=. =minFraction=
-defines the proportion of samples in which a feature (i.e. peak group) has to be
-detected/present. A value of 0.9 would e.g. require that a chromatographic peak
-was detected in 90% of all samples of the experiment. Our data represents
-replicated measurements of the same sample pool and we can thus assume that for
-hook peaks a peak was identified in each file. The parameter =span= defines the
-degree of smoothing of the loess function that is used to allow different
-regions along the retention time axis to be adjusted by a different factor. A
-value of 0 will most likely cause overfitting, while 1 would perform a linear
-regression. Values between 0.4 and 0.6 seem to be reasonable for most
-experiments.
+defines the proportion of samples in which a peak from a peak group (feature)
+has to be detected/present. A value of 0.9 would e.g. require that a
+chromatographic peak was detected in 90% of all samples of the experiment. Our
+data represents replicated measurements of the same sample pool and we can thus
+assume that for hook peaks a peak was identified in each file. The parameter
+=span= defines the degree of smoothing of the loess function that is used to allow
+different regions along the retention time axis to be adjusted by a different
+factor. A value of 0 will most likely cause overfitting, while 1 would perform a
+constant, linear shift. Values between 0.4 and 0.6 seem to be reasonable for
+most experiments.
 
 #+NAME: alignment-correspondence
 #+BEGIN_SRC R :ravel message = FALSE
@@ -622,10 +617,10 @@ inspect the differences between raw and adjusted retention times.
 #+END_SRC
 
 The difference between raw and adjusted retention time should be reasonable. In
-our example it is mostly below one second which, which is OK since the samples
+our example it is mostly below one second, which is OK since the samples
 were measured within a short time period and differences are thus expected to be
 small. Also, hook peaks should ideally be present along the full retention time
-range. In addition we plot the base peak chromatograms before and after
+range. Next we plot the base peak chromatograms before and after
 alignment to get a general overview of the alignment performance.
 
 #+NAME: bpc-raw-adjusted
@@ -639,7 +634,7 @@ alignment to get a general overview of the alignment performance.
 
 The base peak chromatograms are nicely aligned after retention time
 adjustment. The impact of the alignment should also be evaluated on known
-compounds. We thus below plot the XIC for Serine before and after alignment.
+compounds. We thus plot below the XIC for Serine before and after alignment.
 
 #+NAME: serine-xic-adjusted
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "XIC for Serine before (left) and after (right) alignment", fig.width = 10, fig.height = 4
@@ -666,7 +661,7 @@ density/ \cite{Smith:2006ic} and /nearest/ \cite{Katajamaa:2006jh} that can be
 configured by passing either a =PeakDensityParam= or a =NearestPeaksParam= object to
 the =groupChromPeaks= function. For our example we use the peak density method
 that iterates through slices of m/z ranges of the data and groups
-chromatographic peaks (within the same or in other samples) in each if they are
+chromatographic peaks in each (within the same or in other samples) if they are
 close enough in their retention time. Which peaks are grouped together is
 defined based on the distribution of peaks along the retention time that is
 estimated with the R =density= function. To illustrate this we extract below an
@@ -709,13 +704,13 @@ correspondence analysis are:
 - =minSamples=: minimum number of samples a peak has to be present.
 
 The parameters =minFraction= and =minSamples= depend on the experimental layout and
-should be set accordingly. =binSize= should be set to a small enough value that
-peaks from different ions measured at about the same retention time would not be
-grouped together. The most important parameter however is =bw= and, while its
-default value of 30 was able to correctly group the Serine peaks, it should be
-evaluated also on other, more complicated, signals. We thus evaluate the
-performance of the default parameters on an m/z slice that contains also the
-isomers Betaine and Valine ([M+H]+ m/z 118.08625).
+should be set accordingly. =binSize= should be set to a value small enough to
+avoid that peaks from different ions, but with similar m/z, measured at about
+the same retention time, would not be grouped together. The most important
+parameter however is =bw= and, while its default value of 30 was able to correctly
+group the Serine peaks, it should be evaluated also on other, more complicated,
+signals. We thus evaluate the performance of the default parameters on an m/z
+slice that contains also the isomers Betaine and Valine ([M+H]+ m/z 118.08625).
 
 #+NAME: correspondence-bw
 #+BEGIN_SRC R :ravel message = FALSE, fig.cap = "Define correspondence settings to separate Betaine and Valine peaks.", fig.width = 10, fig.height = 10
@@ -797,11 +792,11 @@ function. This function uses the feature definitions to extract the requested
 value from each chromatographic peak assigned to the feature and returns a
 matrix with rows being features and columns samples. The function takes two
 additional parameters =value= and =method=: =value= defines the column in the
-=chromPeaks= table that should be reported and =method= the approach to handle cases
-in which more than one peak in a sample is assigned to the feature. Below we set
-=value = "into"= to extract the total integrated peak area and =method = "maxint"=
-to report the peak area of the peak with the largest intensity for features with
-multiple peaks in a sample.
+=chromPeaks= table that should be reported, and =method= the approach to handle
+cases in which more than one peak in a sample is assigned to the feature. Below
+we set =value = "into"= to extract the total integrated peak area and =method =
+"maxint"= to report the peak area of the peak with the largest intensity for
+features with multiple peaks in a sample.
 
 #+NAME: correspondence-featureValue
 #+BEGIN_SRC R :ravel message = FALSE
@@ -811,7 +806,7 @@ multiple peaks in a sample.
 
 #+END_SRC
 
-Among the first rows in that matrix we can spot already an =NA= value. No peak was
+Among the first rows in that matrix we can spot an =NA= value. No peak was
 assigned to the feature /FT002/ in the second sample, either because peak
 detection failed in that sample, or the corresponding ion is not present in that
 sample. With the =fillChromPeaks= function, =xcms= provides the functionality to
@@ -821,12 +816,12 @@ increase this feature region in m/z and/or retention time dimension: =expandMz=
 and =expandRt= expand the region relative to the width of the area in either m/z
 or rt dimension. =expandMz = 1= would for example expand the regions by half of
 each feature's m/z width on both sides hence resulting in regions with an m/z
-width twice as big as their original width. Finally, =ppm= allows to expand the
-m/z width of each region by an m/z dependent value. Note that in future the
-function will gain two more settings =fixedMz= and =fixedRt= to enable expansion of
-the feature area also by a constant value. Below we first determine the number
-of missing values in the data matrix and subsequently use =fillChromPeaks= to
-fill-in some missing peaks.
+width twice as big as the original width. Finally, =ppm= allows to expand the m/z
+width of each region by an m/z dependent value. Note that in future the function
+will gain two more settings =fixedMz= and =fixedRt= to enable expansion of the
+feature area also by a constant value. Below we first determine the number of
+missing values in the data matrix and subsequently use =fillChromPeaks= to fill-in
+some missing peaks.
 
 #+NAME: fillChromPeaks
 #+BEGIN_SRC R :ravel message = FALSE
