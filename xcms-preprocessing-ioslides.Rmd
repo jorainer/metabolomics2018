@@ -446,43 +446,58 @@ knitr::include_graphics("images/centWave-CWT.png")
 <div>
 - Example: extract chromatographic data for Serine.
 
-```{r centWave-default, message = FALSE, results = "hide", fig.height = 3.5, fig.width = 5 }
+```{r centWave-default, message = FALSE, results = "hide", fig.height = 3.5, fig.width = 5, eval = FALSE}
 srn_chr <- chromatogram(data_cent, rt = c(165, 200),
                         mz = c(106.03, 106.06),
                         aggregationFun = "max")[1, 1]
 plot(srn_chr)
 ```
 </div>
-
-## {.build}
-
 <div>
-- Example: perform peak detection using default centWave parameters.
-
-```{r centWave-default2, message = FALSE}
-cwp <- CentWaveParam()
-findChromPeaks(srn_chr, param = cwp)
+```{r, echo = FALSE, fig.height = 3.2, fig.width = 5}
+srn_chr <- chromatogram(data_cent, rt = c(165, 200),
+                        mz = c(106.03, 106.06),
+                        aggregationFun = "max")[1, 1]
+par(mar = c(4, 4.5, 1.5, 0.5))
+plot(srn_chr)
 ```
 </div>
 
-<div>
+## {.build}
 
-- What went wrong? Default for `peakwidth` does not match the current 
-  data.
+- Example: perform peak detection using default centWave parameters.
+
+```{r centWave-default2, message = FALSE, results = "hide"}
+cwp <- CentWaveParam()
+findChromPeaks(srn_chr, param = cwp)
+```
+
+- **What went wrong?** What's the default for `peakwidth`?
   
 ```{r centWave-default3, message = FALSE}
 peakwidth(cwp)
 ```
-</div>
+  
+- Default for `peakwidth` does not match the current data.
+
   
 ## {.smaller .build}
 
 - Example: change `peakwidth` and run again.
 
-```{r centWave-adapted, message = FALSE, fig.height = 3.5, width = 5}
+```{r centWave-adapted, message = FALSE, fig.height = 3.5, width = 5, eval = FALSE}
 cwp <- CentWaveParam(peakwidth = c(2, 10))
 pks <- findChromPeaks(srn_chr, param = cwp)
 ## Plot the data and higlight identified peak area
+plot(srn_chr)
+rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
+```
+
+```{r, message = FALSE, fig.height = 3.5, width = 5, echo = FALSE}
+cwp <- CentWaveParam(peakwidth = c(2, 10))
+pks <- findChromPeaks(srn_chr, param = cwp)
+## Plot the data and higlight identified peak area
+par(mar = c(4, 4.5, 1.5, 0.5))
 plot(srn_chr)
 rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
 ```
@@ -496,7 +511,7 @@ rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040")
 - Example: evaluate the m/z scattering of the signal for Serine.
 
 ```{r Serine-mz-scattering-plot, message = FALSE, fig.height = 3.5, width = 5 }
-## Restrict the data to signal from Sering
+## Restrict the data to signal from Serine
 srn <- data_cent %>%
     filterRt(rt = c(179, 186)) %>%
     filterMz(mz = c(106.04, 106.06))
@@ -524,7 +539,7 @@ diff(srn_df$mz) * 1e6 / mean(srn_df$mz)
 ## {.build}
 
 <div>
-- Example: perform chromatographic peak detection based on derived settings.
+- Perform chromatographic peak detection based on derived settings.
 
 ```{r findPeaks-centWave, message = FALSE }
 ## Perform peak detection
@@ -534,21 +549,18 @@ data_cent <- findChromPeaks(data_cent, param = cwp)
 </div>
 <div>
 - Result: `XCMSnExp` object extends the `OnDiskMSnExp`, contains preprocessing
-  results *and* enables data access as described above.  </div>
+  results **and** enables data access as described above.  </div>
 
-## {.smaller .build}
+## {.build}
 
 - Example: access the peak detection results. 
 
 ```{r  xcmsnexp, message = FALSE}
-## Access the peak detection results
-head(chromPeaks(data_cent)) 
+head(chromPeaks(data_cent), n = 5) 
 ```
 
 - For quality assessment, we could also do some summary statistics on 
   the identified peaks.
-- `plotChromPeaks` function to plot the location of the identified peak in m/z -
-  rt space.
   
 
 ## Alignment {.build}
