@@ -23,7 +23,7 @@ provided in the [xcms-preprocessing.Rmd](./xcms-preprocessing.Rmd) file. This
 file can be opened with e.g. RStudio which allows execution of the individual R
 commands (see section below for additionally required R packages). The R command
 `rmarkdown::render("xcms-preprocessing.Rmd")` would generate the html file
-[xcms-preprocessing.html](./xcms-preprocessing.html).
+[xcms-preprocessing.html](https://jotsetung.github.io/metabolomics2018/xcms-preprocessing.html).
 
 
 ## Prerequisites
