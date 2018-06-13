@@ -8,12 +8,6 @@ in Bioconductor to work with mass spectrometry
 of a toy data set emphasizing on selection of data-dependent settings for the
 individual pre-processing steps.
 
-**Title**
-
-Updated user interface of xcms for MS data representation and LC-MS data
-pre-processing
-
-
 Covered topics are:
 - Data import and representation.
 - Accessing, subsetting and visualizing data.
@@ -23,7 +17,14 @@ Covered topics are:
 - Evaluation of identified peaks.
 - Alignment (retention time correction).
 - Correspondence (grouping of chromatographic peaks across samples).
-- Evaluating and tuning certain correspondence parameters.
+
+The full R code of all examples along with comprehensive descriptions is
+provided in the [xcms-preprocessing.Rmd](./xcms-preprocessing.Rmd) file. This
+file can be opened with e.g. RStudio which allows execution of the individual R
+commands (see section below for additionally required R packages). The R command
+`rmarkdown::render("xcms-preprocessing.Rmd")` would generate the html file
+[xcms-preprocessing.html](./xcms-preprocessing.html).
+
 
 ## Prerequisites
 
@@ -49,8 +50,11 @@ if (packageVersion("xcms") < "3.3.1")
 - [xcms-preprocessing-ioslides.Rmd](./xcms-preprocessing-ioslides.Rmd): R
   markdown file that is rendered (with
   `rmarkdown::render("xcms-preprocessing-ioslides.Rmd")` into the html
-  presentation for the conference.
+  (ioslides-based) presentation for the conference. This file contains most of
+  the R commands from `xcms-preprocessing.Rmd` but only few descriptions.
 
 - [xcms-preprocessing-bullets.Rmd](./xcms-preprocessing-bullets.Rmd): file with
   complete R code but strongly reduced descriptive content (in form of bullet
-  points). This file is used for the interactive presentation in RStudio.
+  points). This file is thought to be used for an interactive presentation with
+  RStudio (i.e. live execution of commands).
+  
