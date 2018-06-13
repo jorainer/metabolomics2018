@@ -1,12 +1,12 @@
 # metabolomics2018
 
-Workshop material for the xcms (version >= 3) workshop at the metabolomics 2018
-conference in Seattle. The workshop provides an overview of recent developments
-in Bioconductor to work with mass spectrometry
-([MSnbase](https://github.com/lgatto/MSnbase)) and specifically LC-MS data
-([xcms](https://github.com/sneumann/xcms)) and walks through the preprocessing
-of a toy data set emphasizing on selection of data-dependent settings for the
-individual pre-processing steps.
+Workshop material for the xcms (version >= 3) workshop at the Metabolomics
+Society conference 2018 in Seattle (http://metabolomics2018.org). The workshop
+provides an overview of recent developments in Bioconductor to work with mass
+spectrometry ([MSnbase](https://github.com/lgatto/MSnbase)) and specifically
+LC-MS data ([xcms](https://github.com/sneumann/xcms)) and walks through the
+preprocessing of a toy data set emphasizing on selection of data-dependent
+settings for the individual pre-processing steps.
 
 Covered topics are:
 - Data import and representation.
