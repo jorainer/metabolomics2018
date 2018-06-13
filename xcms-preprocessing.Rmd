@@ -29,20 +29,35 @@ by exporting the metabolomics-preprocessing.org file.
 
 This documents describes 
 
-- `xcms` a relatively *old* package for untargeted, LC/GC-MS data preprocessing.
+- `xcms` [Bioconductor](https://bioconductor.org) package for untargeted,
+  LC/GC-MS data preprocessing.
 - Major changes in `xcms` version > 3:
   - re-use data structures from Bioconductor's `MSnbase` package.
   - native MSn support.
   - New functions.
   - Internal changes and code cleanup.
 
+## Prerequisites
+
+The analysis in this document requires an R version >= 3.5.0 and recent versions
+of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages. The code below
+installs all packages for the analysis.
+
+```{r  install-required, eval = FALSE, results = "hide" }
+source("https://bioconductor.org/biocLite.R")
+biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr",
+           "devtools"))
+## Need xcms version > 3.3.1
+if (packageVersion("xcms") < "3.3.1")
+    devtools::install_github("sneumann/xcms", ref = "master") 
+```
 
 ## Mass spectrometry
 
 Mass spectrometry allows to measure abundances of charged ions in a
 sample. Abundances are determined as ion counts for a specific mass-to-charge
-ratio m/z. The measured signal is represented in a spectrum, intensities along
-m/z.
+ratio m/z. The measured signal is represented in a spectrum, i.e. intensities
+along m/z.
 
 ![](images/MS.png)
 
@@ -88,23 +103,6 @@ detection, alignment and correspondence. The workflow does not cover data
 normalization procedures, compound identification and differential abundance
 analysis.
 
-
-## Prerequisites
-
-The analysis in this document requires an R version >= 3.5.0 and recent versions
-of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages. The code below
-installs all packages for the analysis.
-
-```{r  install-required, eval = FALSE, results = "hide" }
-source("https://bioconductor.org/biocLite.R")
-biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr",
-           "devtools"))
-## Need xcms version > 3.3.1
-if (packageVersion("xcms") < "3.3.1")
-    devtools::install_github("sneumann/xcms", ref = "master") 
-```
-
-
 ## Data import and representation
 
 In the code block below we load all required libraries and read our toy data
@@ -122,7 +120,7 @@ function to read only general metadata into memory. The m/z and intensity values
 from the original files are not kept in memory, but retrieved from the original
 files on demand. This enables analyses of also very large experiments.
 
-```{r  load-data, message = FALSE }
+```{r load-data, message = FALSE, warning = FALSE}
 library(MSnbase)
 library(xcms)
 library(doParallel)
@@ -839,6 +837,12 @@ processParam(processHistory(data_cent)[[1]])
   algorithm parameters.
 - More work to come for the analysis of chromatographic data (SRM/MRM) and
   eventually for data normalization.
+
+# Session information
+
+```{r}
+devtools::session_info()
+```
 
 
 # References
