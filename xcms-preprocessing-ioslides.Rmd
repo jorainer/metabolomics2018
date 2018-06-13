@@ -50,6 +50,7 @@ h enable code highlight
 
 Export to pdf:
 webshot function from webshot package.
+Might have to change stuff in the style sheet to make it working.
 library(webshot)
 install_phantomjs()
 fn <- paste0("file://", normalizePath("xcms-preprocessing-ioslides.html"))
@@ -61,9 +62,9 @@ webshot(fn, "xcms-preprocessing-ioslides.pdf", delay = 4, vwidth = 1024, vheight
 The workflow is focused on the **new** `xcms` interface/functions and covers:
 
 <div>
-- Basic MS data handling (`MSnbase`)
+- Basic MS data handling ([`MSnbase`](https://github.com/lgatto/MSnbase))
 - Simple MS data centroiding (`MSnbase`)
-- LC-MS data pre-processing (`xcms`):
+- LC-MS data pre-processing ([`xcms`](https://github.com/sneumann/xcms)):
   - chromatographic peak detection
   - alignment
   - correspondence
@@ -75,7 +76,12 @@ The workflow is focused on the **new** `xcms` interface/functions and covers:
   - differential abundance analysis
 </div>
 
-## Prerequisites {.build}
+## Hands-on? {.build}
+
+<div>
+- https://github.com/jotsetung/metabolomics2018
+- Open *xcms-preprocessing.Rmd* in e.g. [RStudio](https://www.rstudio.com/).
+</div>
 
 <div>
 - R version >= 3.5.0
@@ -84,15 +90,11 @@ The workflow is focused on the **new** `xcms` interface/functions and covers:
 ```{r eval = FALSE, results = "hide", message = FALSE}
 source("https://bioconductor.org/biocLite.R")
 biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr",
-	   "devtools"))
+           "devtools"))
 ## Need xcms version > 3.3.1
 if (packageVersion("xcms") < "3.3.1")
     devtools::install_github("sneumann/xcms", ref = "master") 
 ```
-</div>
-<div>
-- `git clone https://github.com/jotsetung/metabolomics2018`
-- Open *xcms-preprocessing.Rmd* in e.g. RStudio.
 </div>
 
 
@@ -200,20 +202,26 @@ head(rtime(data))
 </div>
 <div>
 - Use `fromFile` to know which values belong to which file/sample.
-- `Spectrum` object: container for m/z and intensity values.
 </div>
 
-----
+## {.build}
 
+<div>
+- Access the data with `mz` and `intensity` functions.
 - `spectra` gets the list of all spectra (from all files). Can be slow
   because full data is read *on-the-fly* from the files.
+</div>
+<div>
 - In most cases we work with subsets anyway: use filter functions to 
   subset the data:
   - `filterFile` subset to individual files/samples.
   - `filterRtime` restrict to specific retention time window.
   - `filterMz` restrict to m/z range.
   - `filterMsLevel` subset to certain MS level(s).
+</div>
+<div>
 - Data access will be fast on indexed mzML, mzXML and CDF files.
+</div>
 
 ## {.build}
 
@@ -236,7 +244,7 @@ length(sps)
 sapply(sps, fromFile) 
 ```
 
-----
+## {.build}
 
 - Example: plot the data from the last spectrum
 
@@ -249,11 +257,8 @@ plot(sps[[6]])
 
 ## {.smaller .build}
 
-<div>
 - `chromatogram`: extract chromatographic data (intensities along retention time
   for a certain m/z range).
-</div>
-<div>
 - Example: get the total ion chromatogram for each file.
 
 ```{r chromatogram, message = FALSE, fig.width = 7.5, fig.height = 4 }
@@ -262,14 +267,10 @@ chr <- chromatogram(data)
 ## Plot the tic
 plot(chr) 
 ```
-</div>
 
 ## {.smaller .build}
 
-<div>
 - `aggregationFun` parameter allows to switch from TIC `"sum"` to BPC `"max"`.
-</div>
-<div>
 - Example: extract ion chromatogram for Serine (m/z of [M+H]+ adduct 106.0455).
 
 ```{r serine-xic, message = FALSE, fig.height = 4, fig.width = 7.5}
@@ -279,7 +280,6 @@ data %>%
     chromatogram(aggregationFun = "max") %>%
     plot()
 ```
-</div>
 
 ## Summarizing
 
@@ -367,19 +367,21 @@ data_cent %>%
     plot(type = "XIC") 
 ```
 
-----
+## {.build}
 
-- Note: data smoothing and centroiding is applied to the data 
-  *on-the-fly* each time m/z or intensity values are accessed.
-- Example: export the smoothed data to new files and re-read 
-  the data.
-
+<div>
+- Note: since data is not available in memory, data smoothing and centroiding is
+  applied *on-the-fly* each time m/z or intensity values are accessed.
+</div>
+<div>
+- To make changes persistent: export and re-read the data.
 ```{r remove-exported, message = FALSE, echo = FALSE, results = "hide"}
 lapply(basename(fileNames(data)), function (z) {
     if (file.exists(z))
         file.remove(z)
 })
 ```
+</div>
 
 ```{r export-centroided, message = FALSE, warning = FALSE }
 ## Write the centroided data to files with the same names in the current
@@ -419,6 +421,9 @@ data_cent <- readMSData(fls_new, pdata = new("NAnnotatedDataFrame", pd),
 knitr::include_graphics("images/centWave-ROI.png")
 ```
 
+<div style="position:absolute; top:95%; left:60%; font-size: 50%">
+[Tautenhahn *BMC Bionformatics* 2008]
+</div>
 
 ----
 
@@ -428,9 +433,13 @@ knitr::include_graphics("images/centWave-ROI.png")
 knitr::include_graphics("images/centWave-CWT.png")
 ```
 
-## {.smaller .build}
+<div style="position:absolute; top:95%; left:60%; font-size: 50%">
+[Tautenhahn *BMC Bionformatics* 2008]
+</div>
 
-- centWave parameters: `?CentWaveParam`, crucial: `peakwidth`, `ppm`.
+## {.build}
+
+- Crucial centWave parameters: `peakwidth`, `ppm`; list all with `?CentWaveParam`.
 
 - `peakwidth`: minimal and maximal expected peak width.
 
@@ -438,7 +447,6 @@ knitr::include_graphics("images/centWave-CWT.png")
 - Example: extract chromatographic data for Serine.
 
 ```{r centWave-default, message = FALSE, results = "hide", fig.height = 3.5, fig.width = 5 }
-## Get the XIC for serine in the first file
 srn_chr <- chromatogram(data_cent, rt = c(165, 200),
                         mz = c(106.03, 106.06),
                         aggregationFun = "max")[1, 1]
