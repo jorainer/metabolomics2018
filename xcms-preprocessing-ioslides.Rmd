@@ -184,9 +184,6 @@ head(rtime(data))
 <div>
 - Access MS data: `spectra`, `mz`, `intensity`: reads data from files.
 </div>
-<div>
-- Use `fromFile` to know which values belong to which file/sample.
-</div>
 
 ## {.build}
 
@@ -238,27 +235,20 @@ plot(sps[[6]])
 
 ## {.build}
 
-- `chromatogram`: extract chromatographic data (intensities along retention time
-  for a certain m/z range).
-- Example: get the total ion chromatogram for each file.
+- `chromatogram`: extract chromatographic data.
 
-```{r chromatogram, message = FALSE, fig.width = 7.5, fig.height = 4 , eval = FALSE}
-chr <- chromatogram(data)
-plot(chr) 
+
+- Example: XIC for Serine (m/z of [M+H]+ adduct 106.0455).
+
+```{r serine-xic, message = FALSE, fig.height = 4, fig.width = 7.5, eval = FALSE}
+data %>%
+    filterRt(rt = c(175, 189)) %>%
+    filterMz(mz = c(106.02, 106.07)) %>%
+    chromatogram(aggregationFun = "max") %>%
+    plot()
 ```
-```{r chromatogram-plot, message = FALSE, fig.width = 7.5, fig.height = 3.5 , echo = FALSE}
-chr <- chromatogram(data)
+```{r serine-xic-plot, message = FALSE, fig.height = 3.3, fig.width = 7.5, echo = FALSE}
 par(mar = c(4, 4.5, 1, 0.5))
-plot(chr) 
-```
-
-
-## {.smaller .build}
-
-- `aggregationFun` parameter allows to switch from TIC `"sum"` to BPC `"max"`.
-- Example: extracted ion chromatogram for Serine (m/z of [M+H]+ adduct 106.0455).
-
-```{r serine-xic, message = FALSE, fig.height = 4, fig.width = 7.5}
 data %>%
     filterRt(rt = c(175, 189)) %>%
     filterMz(mz = c(106.02, 106.07)) %>%
@@ -539,29 +529,19 @@ head(chromPeaks(data_cent), n = 5)
 
 ## Alignment {.build}
 
+<div>
 - Aim: adjust shifts in retention times between samples.
-- Example: plot the base peak chromatograms of all files.
-```{r alignment-bpc-raw, message = FALSE, fig.width = 8, fig.height = 3.5 , eval = FALSE}
-## Extract base peak chromatograms
-bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
-plot(bpc_raw)
-```
-
-```{r alignment-bpc-raw-plot, message = FALSE, fig.width = 8, fig.height = 3.5, echo = FALSE }
-## Extract base peak chromatograms
-par(mar = c(4, 4.5, 1, 0.5))
-bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
-plot(bpc_raw)
-```
-
-----
-
+</div>
+<div>
 - Function: `adjustRtime`.
+<div>
+<div>
 - Available methods:
   - *peakGroups* (`PeakGroupsParam`) [Smith *Anal. chem.* 2006]: align samples 
     based on *hook* peaks.
   - *obiwarp* (`ObiwarpParam`) [Prince *Anal. chem.* 2006]: warps the (full) 
     data to a reference sample.
+</div>
 
 ## | peakGroups {.build}
 
@@ -624,7 +604,7 @@ plotAdjustedRtime(data_cent)
 ```{r bpc-raw-adjusted, message = FALSE, eval = FALSE }
 par(mfrow = c(2, 1))
 ## Plot the raw base peak chromatogram
-plot(bpc_raw)
+plot(chromatogram(data_cent, adjusted = FALSE, aggregationFun = "max"))
 ## Plot the BPC after alignment
 plot(chromatogram(data_cent, aggregationFun = "max")) 
 ```
@@ -634,7 +614,7 @@ plot(chromatogram(data_cent, aggregationFun = "max"))
 ```{r bpc-raw-adjusted-plot, message = FALSE, echo = FALSE, fig.width = 7, fig.height = 6 }
 par(mfrow = c(2, 1), mar = c(4, 4.5, 1, 0.5))
 ## Plot the raw base peak chromatogram
-plot(bpc_raw)
+plot(chromatogram(data_cent, adjusted = FALSE, aggregationFun = "max"))
 ## Plot the BPC after alignment
 plot(chromatogram(data_cent, aggregationFun = "max")) 
 ```
@@ -671,9 +651,10 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 
 - Iterates through MS data slices aling m/z and groups chromatographic in each
   if peaks (from same or different samples) are close in retention time.
-- Whether they are close is estimated on the distribution of peaks along the
-  retention time.
-	
+- Distribution of peaks along retention time axis is used to define which peaks
+  to group.
+  
+
 ## {.build}
 
 <div>
@@ -817,7 +798,7 @@ plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
 
 ##
 
-- Perform the correspondence analysis with the derived settings.
+- Perform the correspondence analysis with settings tuned for our data set.
 
 ```{r  correspondence-analysis, message = FALSE}
 pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8,
