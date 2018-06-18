@@ -1,6 +1,6 @@
 ---
 title: "Metabolomics data pre-processing using xcms"
-author: "Johannes Rainer<br><strong>Eurac Research</strong>, Bolzano, Italy<br>johannes.rainer@eurac.edu github/twitter: jotsetung"
+author: "Johannes Rainer<br><strong>Eurac Research</strong>, Bolzano, Italy<br>johannes.rainer@eurac.edu - github/twitter: jotsetung"
 date: "24 June 2018"
 output: 
   ioslides_presentation:
@@ -57,6 +57,13 @@ fn <- paste0("file://", normalizePath("xcms-preprocessing-ioslides.html"))
 webshot(fn, "xcms-preprocessing-ioslides.pdf", delay = 4, vwidth = 1024, vheight = 768)
 -->
 
+## Hands-on? {.build}
+
+<div>
+- https://github.com/jotsetung/metabolomics2018
+- Open *xcms-preprocessing.Rmd* in e.g. [RStudio](https://www.rstudio.com/).
+</div>
+
 ## Content {.build}
 
 This presentation focuses on updates of `xcms`:
@@ -75,12 +82,6 @@ Content:
   - correspondence
 </div>
 
-## Hands-on? {.build}
-
-<div>
-- https://github.com/jotsetung/metabolomics2018
-- Open *xcms-preprocessing.Rmd* in e.g. [RStudio](https://www.rstudio.com/).
-</div>
 
 
 <!-- ## Background -->
@@ -119,12 +120,13 @@ register(bpstart(DoparParam()), default = TRUE)
 ```
 
 <div>
-- Data set:
+- **Data set**:
   - subset from 2 files with pooled serum samples
   - UHPLC (Agilent 1290) coupled with Q-TOF MS (TripleTOF 5600+ AB Sciex)
   - HILIC-based chromatographic separation
 </div>
 <div>
+- Define file names and sample descriptions.
 ```{r load-data, message = FALSE }
 fls <- dir(system.file("sciex", package = "msdata"), full.names = TRUE)
 
@@ -139,8 +141,6 @@ pd <- data.frame(file = basename(fls), injection_idx = c(1, 19),
 
 <div>
 - Read data from mzML/mzXML/CDF files with `readMSData` function.
-- `mode = "onDisk"`: reads only spectrum header from files, but no data.
-- on-disk mode enables analysis of very large experiments.
 </div>
 
 <div>
@@ -151,6 +151,10 @@ data <- readMSData(fls, pdata = new("NAnnotatedDataFrame", pd),
 ```
 </div>
 
+<div>
+- `mode = "onDisk"`: reads only spectrum header from files, but no data.
+- on-disk mode enables analysis of very large experiments.
+</div>
 
 ## Basic data access {.build}
 
@@ -175,20 +179,10 @@ data$injection_idx
 <div>
 - Access general spectrum information: `msLevel`, `centroided`, `rtime`,
   `polarity`.
-  
-```{r  general-access, message = FALSE }
-## Get the retention time
-head(rtime(data))
-```
 </div>
 <div>
 - Access MS data: `spectra`, `mz`, `intensity`: reads data from files.
 </div>
-
-## {.build}
-
-## Data filtering {.build}
-
 <div>
 - In most cases we work with subsets: use filter functions to 
   subset the data:
@@ -196,9 +190,6 @@ head(rtime(data))
   - `filterRtime` restrict to specific retention time window.
   - `filterMz` restrict to m/z range.
   - `filterMsLevel` subset to certain MS level(s).
-</div>
-<div>
-- Data access will be fast on indexed mzML, mzXML and CDF files.
 </div>
 
 ## {.build}
@@ -265,7 +256,7 @@ data %>%
 </div>
 <div>
 - `xcms`, specifically *centWave* was designed for centroided data.
-- `MSnase` provides basic tools to perform MS data smoothing and 
+- `MSnbase` provides basic tools to perform MS data smoothing and 
   centroiding: `smooth` and `pickPeaks`.
 </div>
 <div>
@@ -527,37 +518,25 @@ head(chromPeaks(data_cent), n = 5)
 ```
   
 
-## Alignment {.build}
+## Alignment - in short {.build}
 
 <div>
 - Aim: adjust shifts in retention times between samples.
 </div>
 <div>
 - Function: `adjustRtime`.
-<div>
+</div>
 <div>
 - Available methods:
-  - *peakGroups* (`PeakGroupsParam`) [Smith *Anal. chem.* 2006]: align samples 
-    based on *hook* peaks.
   - *obiwarp* (`ObiwarpParam`) [Prince *Anal. chem.* 2006]: warps the (full) 
     data to a reference sample.
 </div>
+<div>
+  - *peakGroups* (`PeakGroupsParam`) [Smith *Anal. chem.* 2006]: 
+    - align spectra from different samples based on *hook* peaks.
+    - Need to define the hook peaks first: peaks present in most/all samples.
+</div>
 
-## | peakGroups {.build}
-
-<div>
-- Adjusts all retention times by aligning hook peaks.
-</div>
-<div>
-- Important parameters:
-  - `minFraction`: proportion of samples in which a feature has to be 
-    present (0.9 for present in 90% of samples).
-  - `span`: degree of smoothing for the loess function. Values between 0.4 and
-	0.6 seem reasonable.
-</div>
-<div>
-- But: need to define the hook peaks first: peaks present in most/all samples.
-</div>
 
 ## {.build}
 
@@ -570,7 +549,6 @@ head(chromPeaks(data_cent), n = 5)
 pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8,
                         minFraction = 1, binSize = 0.02)
 data_cent <- groupChromPeaks(data_cent, pdp)
-
 ```
 
 <div>
@@ -601,30 +579,10 @@ plotAdjustedRtime(data_cent)
 ## {.build}
 
 - Plot BPC before and after alignment.
-```{r bpc-raw-adjusted, message = FALSE, eval = FALSE }
-par(mfrow = c(2, 1))
-## Plot the raw base peak chromatogram
-plot(chromatogram(data_cent, adjusted = FALSE, aggregationFun = "max"))
-## Plot the BPC after alignment
-plot(chromatogram(data_cent, aggregationFun = "max")) 
-```
-
-----
-
-```{r bpc-raw-adjusted-plot, message = FALSE, echo = FALSE, fig.width = 7, fig.height = 6 }
-par(mfrow = c(2, 1), mar = c(4, 4.5, 1, 0.5))
-## Plot the raw base peak chromatogram
-plot(chromatogram(data_cent, adjusted = FALSE, aggregationFun = "max"))
-## Plot the BPC after alignment
-plot(chromatogram(data_cent, aggregationFun = "max")) 
-```
-
-## {.build}
-
 - Plot XIC of known compounds before and after alignment.
-```{r serine-xic-adjusted, message = FALSE, fig.cap = "XIC for Serine before (left) and after (right) alignment", fig.width = 8, fig.height = 3.5 }
+```{r serine-xic-adjusted, message = FALSE, fig.width = 8, fig.height = 3.1 }
 ## Use adjustedRtime parameter to access raw/adjusted retention times
-par(mfrow = c(1, 2), mar = c(4, 4.5, 1, 0.5))
+par(mfrow = c(1, 2), mar = c(4, 4.5, 0.9, 0.5))
 plot(chromatogram(data_cent, mz = c(106.04, 106.06),
                   rt = c(179, 186), adjustedRtime = FALSE))
 plot(chromatogram(data_cent, mz = c(106.04, 106.06),
@@ -649,11 +607,19 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 
 ## | peak density {.build}
 
-- Iterates through MS data slices aling m/z and groups chromatographic in each
-  if peaks (from same or different samples) are close in retention time.
+<div>
+- Iterate through MS data slices along m/z
+- Group chromatographic in each slice if peaks (from same or different samples)
+  are close in retention time.
+</div>
+<div>
 - Distribution of peaks along retention time axis is used to define which peaks
   to group.
-  
+</div>
+<div>
+- `plotChromPeakDensity`: plot distribution of identified peaks along rt for a
+  given m/z slice.
+</div>
 
 ## {.build}
 
@@ -886,8 +852,14 @@ sum(is.na(featureValues(data_cent)))
 
 ## Acknowledgments
 
+> - Jan Stanstrup (University of Copenhagen, Denmark)
+
 > - Laurent Gatto (University of Cambridge, UK); `MSnbase`, `mzR`.
 
 > - Steffen Neumann (IPB Halle, Germany); `xcms`, `mzR`
 
 > - **YOU for your attention!**
+
+<div style="position:absolute; left:30%; top:90%">
+https://github.com/jotsetung/metabolomics2018
+</div>
