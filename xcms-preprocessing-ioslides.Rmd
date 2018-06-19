@@ -83,29 +83,6 @@ Content:
 </div>
 
 
-
-<!-- ## Background -->
-
-<!-- - `xcms` part of Bioconductor since 2006, *standard* toolbox for LC/GC-MS data -->
-<!--   preprocessing. -->
-<!-- - Major changes in `xcms` version > 3: -->
-<!--   - re-use data structures from Bioconductor's `MSnbase` package -->
-<!--   - native MSn support -->
-<!--   - new functions simplifying raw data access -->
-<!--   - internal changes and code cleanup -->
-
-
-<!-- ## Definitions and common naming convention -->
-
-<!-- - **chromatographic peak**: signal from an ion along retention time dimension. -->
-<!-- - **chromatographic peak detection**: process in which chromatographic peaks are -->
-<!--   identified within each file. -->
-<!-- - **alignment**: process that adjusts retention time differences between files. -->
-<!-- - **correspondence**: grouping of chromatographic peaks (presumably from the -->
-<!--   same ion) across files. -->
-<!-- - **feature**: chromatographic peaks grouped across samples. -->
-
-
 # Basic MS data handling
 
 ## Data import and representation {.build}
@@ -121,7 +98,7 @@ register(bpstart(DoparParam()), default = TRUE)
 
 <div>
 - **Data set**:
-  - subset from 2 files with pooled serum samples
+  - subset from 2 files with pooled human serum samples
   - UHPLC (Agilent 1290) coupled with Q-TOF MS (TripleTOF 5600+ AB Sciex)
   - HILIC-based chromatographic separation
 </div>
@@ -288,10 +265,9 @@ data %>%
 ## {.build}
 
 <div>
-- Example: smooth data in m/z dimension with Savitzky-Golay 
-  filter followed by a centroiding that simply reports the maximum 
-  signal for each mass peak in each spectrum. See `?pickPeaks` for 
-  more advanced options.
+- Example: smooth data with Savitzky-Golay filter followed by a centroiding that
+  simply reports the maximum signal for each mass peak in each spectrum. See
+  `?pickPeaks` for more advanced options.
 
 ```{r centroiding, message = FALSE, warning = FALSE, eval = FALSE}
 ## Smooth the signal, then do a simple peak picking.
@@ -349,7 +325,7 @@ writeMSData(data_cent, file = fls_new)
 
 ## Read the centroided data.
 data_cent <- readMSData(fls_new, pdata = new("NAnnotatedDataFrame", pd),
-			mode = "onDisk") 
+                        mode = "onDisk") 
 ```
 
 
@@ -445,7 +421,7 @@ peakwidth(cwp)
 - Reduce `peakwidth` and run peak detection again.
 
 ```{r centWave-adapted, message = FALSE, fig.height = 3.5, width = 5, eval = FALSE}
-peakwidth(cwp) <- c(2, 10))
+peakwidth(cwp) <- c(2, 10)
 pks <- findChromPeaks(srn_chr, param = cwp)
 ## Plot the data and higlight identified peak area
 plot(srn_chr)
@@ -481,7 +457,7 @@ plot(srn, type = "XIC")
 
 ## {.build}
 
-- Example: calculate the difference in m/z values between consecutive scans.
+- Example: calculate the difference of m/z values between consecutive scans.
 
 ```{r define-ppm, message = FALSE }
 ## Extract mz values for Serine from first file
@@ -573,7 +549,7 @@ par(mar = c(4, 4.5, 0.5, 0.5))
 plotAdjustedRtime(data_cent)
 ```
 
-- Difference between raw and adjusted retention time resonable.
+- Difference between raw and adjusted retention times resonable.
 - Hook peaks along the full retention time range.
 
 ## {.build}
@@ -626,8 +602,8 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 <div>
 - Example: 
   - Plot data for the m/z slice containing the Serine peak.
-  - Use `plotChromPeakDensity` to *dry-run* a correspondence analysis in the
-    same slice.
+  - Use `plotChromPeakDensity` to simulate a correspondence analysis in the same
+    slice.
 </div>
 <div>
 ```{r correspondence-example, message = FALSE, eval = FALSE}
@@ -685,7 +661,7 @@ plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
 
 
 > - `binSize` should be small enough to avoid peaks from different ions 
-    measured at the similar retention time to be grouped together.
+    measured at similar retention times to be grouped together.
 
 > - `bw` is the most important parameter.
 
@@ -764,7 +740,7 @@ plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
 
 ##
 
-- Perform the correspondence analysis with settings tuned for our data set.
+- Perform the correspondence analysis with tuned settings.
 
 ```{r  correspondence-analysis, message = FALSE}
 pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8,
@@ -794,7 +770,7 @@ head(fmat)
 - `featureValues` parameters:
   - `value`: name of the column in `chromPeaks` that should be returned.
   - `method`: for features with multiple peaks in one sample: from which
-    peak the should the value be returned?
+    peak should the value be returned?
 
 ## Missing values {.build}
 
@@ -837,7 +813,7 @@ sum(is.na(featureValues(data_cent)))
 ## Summary {.build}
 
 <div>
-- The new data objects and functions are aimed to:
+- The new data objects and functions aim to:
   - simplify data access and inspection of results
   - facilitate data set-dependent definition  of algorithm parameters.
 </div>
