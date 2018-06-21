@@ -584,9 +584,9 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 ## | peak density {.build}
 
 <div>
-- Iterate through MS data slices along m/z
-- Group chromatographic in each slice if peaks (from same or different samples)
-  are close in retention time.
+- Iterate through slices along m/z.
+- Compare retention times of peaks within each slice and group peaks if they are
+  close.
 </div>
 <div>
 - Distribution of peaks along retention time axis is used to define which peaks
@@ -594,7 +594,7 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 </div>
 <div>
 - `plotChromPeakDensity`: plot distribution of identified peaks along rt for a
-  given m/z slice.
+  given m/z slice; simulates correspondence analysis.
 </div>
 
 ## {.build}
@@ -790,24 +790,6 @@ head(fmat)
     is grown by half of the feature's m/z width on both sides.
   - `ppm`: expand the m/z width by a m/z dependent value.
 </div>
-
-## {.build}
-
-- Example: evaluate number of missing peaks and use `fillChromPeaks` to retrieve
-  a signal for them from the raw files.
-
-```{r fillChromPeaks, message = FALSE }
-## Number of missing values
-sum(is.na(fmat))
-
-## Define the settings for the fill-in of missing peaks
-fpp <- FillChromPeaksParam(expandMz = 0.5, expandRt = 0.5, ppm = 20)
-data_cent <- fillChromPeaks(data_cent, param = fpp)
-
-## How many missing values after
-sum(is.na(featureValues(data_cent)))
-
-```
 
 
 ## Summary {.build}
