@@ -329,9 +329,12 @@ mass peaks for Serine, that are represented by a distribution of signal in both
 retention time and m/z dimension.
 
 Next we smooth the data in each spectrum using a Savitzky-Golay filter, which
-usually improves data quality by reducing noise. Subsequently we perform a
-centroiding analysis based on a simple peak-picking strategy that reports the
-maximum signal for each mass peak in each spectrum.
+usually improves data quality by reducing noise. Note that there is also the
+possibility to smooth signal between consecutive spectra (i.e. smooth signals
+along the retention time dimension); have a look at the help page for the
+`combineSpectraMovingWindow` function. Subsequently we perform a centroiding
+analysis based on a simple peak-picking strategy that reports the maximum signal
+for each mass peak in each spectrum.
 
 ```{r  centroiding, message = FALSE, warning = FALSE, fig.cap = "Centroided data for Serine.", fig.width = 10, fig.height = 5, fig.pos = "h!", warning = FALSE }
 ## Smooth the signal, then do a simple peak picking.
