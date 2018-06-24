@@ -25,6 +25,9 @@ commands (see section below for additionally required R packages). The R command
 `rmarkdown::render("xcms-preprocessing.Rmd")` would generate the html file
 [xcms-preprocessing.html](https://jotsetung.github.io/metabolomics2018/xcms-preprocessing.html).
 
+For those that can not attend the workshop: you can have a look at the
+presentation online [xcms-preprocessing-ioslides.html](https://jotsetung.github.io/metabolomics2018/xcms-preprocessing-ioslides.html).
+
 
 ## Prerequisites
 
