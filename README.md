@@ -1,3 +1,6 @@
+Note: this branch illustrates and compares the usage of the new hdf5-file-based
+`Hdf5MSnExp` object from `MSnbase`.
+
 # metabolomics2018
 
 Workshop material for the xcms (version >= 3) workshop at the Metabolomics
@@ -23,10 +26,10 @@ provided in the [xcms-preprocessing.Rmd](./xcms-preprocessing.Rmd) file. This
 file can be opened with e.g. RStudio which allows execution of the individual R
 commands (see section below for additionally required R packages). The R command
 `rmarkdown::render("xcms-preprocessing.Rmd")` would generate the html file
-[xcms-preprocessing.html](https://jotsetung.github.io/metabolomics2018/xcms-preprocessing.html).
+[xcms-preprocessing.html](https://jorainer.github.io/metabolomics2018/xcms-preprocessing.html).
 
 For those that can not attend the workshop: you can have a look at the
-presentation online [xcms-preprocessing-ioslides.html](https://jotsetung.github.io/metabolomics2018/xcms-preprocessing-ioslides.html).
+presentation online [xcms-preprocessing-ioslides.html](https://jorainer.github.io/metabolomics2018/xcms-preprocessing-ioslides.html).
 
 
 ## Prerequisites
@@ -36,11 +39,9 @@ of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages. The code
 below installs all packages for the analysis.
 
 ```
-source("https://bioconductor.org/biocLite.R")
-biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr", "devtools"))
-## Need xcms version > 3.3.1
-if (packageVersion("xcms") < "3.3.1")
-    devtools::install_github("sneumann/xcms", ref = "master") 
+install("BiocManager")
+BiocManager::install(c("xcms", "MSnbase", "doParallel", "msdata", 
+    "magrittr", "devtools"))
 ```
 
 

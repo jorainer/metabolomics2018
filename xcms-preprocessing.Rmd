@@ -35,16 +35,17 @@ This documents describes
 ## Prerequisites
 
 The analysis in this document requires an R version >= 3.5.0 and recent versions
-of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages. The code
-below installs all packages for the analysis.
+of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages available
+through Bioconductor version 3.8. The packages can be installed with:
+
 
 ```{r  install-required, eval = FALSE, results = "hide" }
-source("https://bioconductor.org/biocLite.R")
-biocLite(c("xcms", "MSnbase", "doParallel", "msdata", "magrittr",
-           "devtools"))
-## Need xcms version > 3.3.1
-if (packageVersion("xcms") < "3.3.1")
-    devtools::install_github("sneumann/xcms", ref = "master") 
+#' Install the Bioconductor package manager
+install.packages("BiocManager")
+
+#' Install the required packages
+BiocManager::install(c("xcms", "MSnbase", "doParallel", "msdata",
+                       "magrittr"))
 ```
 
 The
