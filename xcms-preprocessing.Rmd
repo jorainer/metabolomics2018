@@ -51,7 +51,7 @@ BiocManager::install(c("xcms", "MSnbase", "doParallel", "msdata",
 The
 [xcms-preprocessing.Rmd](https://github.com/jorainer/metabolomics2018/blob/master/xcms-preprocessing.Rmd)
 file with all the code for the analysis can be downloaded from github:
-https://github.com/jorainer/metabolomics2018 .
+https://github.com/jorainer/metabolomics2018 
 
 
 ## Mass spectrometry
