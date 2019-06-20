@@ -1,3 +1,5 @@
+*2019-06-20*: Updated to match `xcms` functionality available with Bioconductor
+version 3.9.
 
 # metabolomics2018
 
