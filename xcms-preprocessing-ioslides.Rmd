@@ -1,7 +1,7 @@
 ---
 title: "Metabolomics data pre-processing using xcms"
-author: "Johannes Rainer<br><strong>Eurac Research</strong>, Bolzano, Italy<br>johannes.rainer@eurac.edu - github/twitter: jotsetung"
-date: "24 June 2018"
+author: "Johannes Rainer<br><strong>Eurac Research</strong>, Bolzano, Italy<br>johannes.rainer@eurac.edu - github: jorainer twitter: jo_rainer"
+date: "24 June 2018; Updated 20 June 2019"
 output: 
   ioslides_presentation:
     widescreen: true
@@ -91,9 +91,7 @@ Content:
 library(xcms)
 library(magrittr)
 ## Set up parallel processing using 3 cores
-library(doParallel)
-registerDoParallel(3)
-register(bpstart(DoparParam()), default = TRUE) 
+register(bpstart(MulticoreParam(3)), default = TRUE) 
 ```
 
 <div>
@@ -383,7 +381,7 @@ knitr::include_graphics("images/centWave-CWT.png")
 ```{r centWave-default, message = FALSE, results = "hide", fig.height = 3.5, fig.width = 5, eval = FALSE}
 srn_chr <- chromatogram(data_cent, rt = c(165, 200),
                         mz = c(106.03, 106.06),
-                        aggregationFun = "max")[1, 1]
+                        aggregationFun = "max")
 plot(srn_chr)
 ```
 </div>
@@ -391,7 +389,7 @@ plot(srn_chr)
 ```{r, echo = FALSE, fig.height = 3.2, fig.width = 5}
 srn_chr <- chromatogram(data_cent, rt = c(165, 200),
                         mz = c(106.03, 106.06),
-                        aggregationFun = "max")[1, 1]
+                        aggregationFun = "max")
 par(mar = c(4, 4.5, 1.5, 0.5))
 plot(srn_chr)
 ```
@@ -419,22 +417,21 @@ peakwidth(cwp)
 ## {.smaller .build}
 
 - Reduce `peakwidth` and run peak detection again.
+- *Note*: `chromatogram` will also extract identified chrom peaks.
 
 ```{r centWave-adapted, message = FALSE, fig.height = 3.5, width = 5, eval = FALSE}
 peakwidth(cwp) <- c(2, 10)
-pks <- findChromPeaks(srn_chr, param = cwp)
+srn_chr <- findChromPeaks(srn_chr, param = cwp)
 ## Plot the data and higlight identified peak area
 plot(srn_chr)
-rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
 ```
 
 ```{r, message = FALSE, fig.height = 3.5, width = 5, echo = FALSE}
 cwp <- CentWaveParam(peakwidth = c(2, 10))
-pks <- findChromPeaks(srn_chr, param = cwp)
+srn_chr <- findChromPeaks(srn_chr, param = cwp)
 ## Plot the data and higlight identified peak area
 par(mar = c(4, 4.5, 1.5, 0.5))
 plot(srn_chr)
-rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
 ```
 
 - Ideally check settings on more known compounds.
@@ -607,18 +604,14 @@ plot(chromatogram(data_cent, mz = c(106.04, 106.06),
 </div>
 <div>
 ```{r correspondence-example, message = FALSE, eval = FALSE}
-## Plot the BPC for the m/z slice containing serine
-par(mfrow = c(2, 1), mar = c(4, 4.3, 1, 0.5))
-plot(chromatogram(data_cent, mz = c(106.04, 106.06), aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = c(106.04, 106.06),
-                    whichPeaks = "apex_within")
-
+## Extract a BPC for an m/z slice containing serine
+bpc_srn <- chromatogram(data_cent, mz = c(106.04, 106.06),
+                        aggregationFun = "max")
 ## Get default parameters for the grouping
 pdp <- PeakDensityParam(sampleGroups = data_cent$group)
 
 ## Dry-run correspondence and show the results.
-plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
-                     type = "apex_within", param = pdp)
+plotChromPeakDensity(bpc_srn, param = pdp)
  
 ```
 </div>
@@ -628,16 +621,13 @@ plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
 ```{r correspondence-example-plot, message = FALSE, width = 7, height = 5, echo = FALSE}
 ## Plot the BPC for the m/z slice containing serine
 par(mfrow = c(2, 1), mar = c(4, 4.3, 1, 0.5))
-plot(chromatogram(data_cent, mz = c(106.04, 106.06), aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = c(106.04, 106.06),
-                    whichPeaks = "apex_within")
-
+bpc_srn <- chromatogram(data_cent, mz = c(106.04, 106.06),
+                        aggregationFun = "max")
 ## Get default parameters for the grouping
 pdp <- PeakDensityParam(sampleGroups = data_cent$group)
 
 ## Dry-run correspondence and show the results.
-plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
-                     type = "apex_within", param = pdp)
+plotChromPeakDensity(bpc_srn, param = pdp)
  
 ```
 
@@ -671,30 +661,23 @@ plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
   isomers Betaine and Valine ([M+H]+ m/z 118.08625).
 
 ```{r correspondence-bw, message = FALSE, eval = FALSE}
-par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
 ## Plot the chromatogram for an m/z slice containing Betaine and Valine
 mzr <- 118.08625 + c(-0.01, 0.01)
-plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
-
+chr <- chromatogram(data_cent, mz = mzr, aggregationFun = "max")
 ## Correspondence in that slice using default settings
 pdp <- PeakDensityParam(sampleGroups = data_cent$group)
-plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
+plotChromPeakDensity(chr, param = pdp)
 
 ```
 
 ##
 
 ```{r correspondence-bw-plot, message = FALSE, width = 7, height = 5, echo = FALSE}
-par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
-## Plot the chromatogram for an m/z slice containing Betaine and Valine
 mzr <- 118.08625 + c(-0.01, 0.01)
-plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
-
+chr <- chromatogram(data_cent, mz = mzr, aggregationFun = "max")
 ## Correspondence in that slice using default settings
 pdp <- PeakDensityParam(sampleGroups = data_cent$group)
-plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
+plotChromPeakDensity(chr, param = pdp)
 
 ```
 
@@ -708,30 +691,17 @@ plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within")
 - Test smaller `bw` (`1.8`) on the same slice.
 
 ```{r correspondence-bw2, message = FALSE, eval = FALSE}
-par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
-## Plot the chromatogram for an m/z slice containing Betaine and Valine
-mzr <- 118.08625 + c(-0.01, 0.01)
-plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
-
 ## Reducing the bandwidth
 pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8)
-plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within") 
+plotChromPeakDensity(chr, param = pdp) 
 ```
 
 
 ##
 
 ```{r correspondence-bw2-plot, message = FALSE, fig.width = 7, fig.height = 5, echo = FALSE}
-par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
-## Plot the chromatogram for an m/z slice containing Betaine and Valine
-mzr <- 118.08625 + c(-0.01, 0.01)
-plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
-
-## Reducing the bandwidth
 pdp <- PeakDensityParam(sampleGroups = data_cent$group, bw = 1.8)
-plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within") 
+plotChromPeakDensity(chr, param = pdp) 
 ```
 
 > - Reducing the `bw` enabled grouping of isomers into different
@@ -819,5 +789,5 @@ head(fmat)
 > - **YOU for your attention!**
 
 <div style="position:absolute; left:30%; top:90%">
-https://github.com/jotsetung/metabolomics2018
+https://github.com/jorainer/metabolomics2018
 </div>
