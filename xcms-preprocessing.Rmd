@@ -2,21 +2,15 @@
 title: "Metabolomics data pre-processing using xcms"
 author: 
 - name: "Johannes Rainer"
-  affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github/twitter: jotsetung"
+  affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github: jorainer twitter: jo_rainer"
 graphics: yes
-date: "24 June 2018"
+date: "24 June 2018; updated June 20 2019"
 output:
   BiocStyle::html_document:
     number_sections: true
     toc_float: true
     toc_depth: 2
 bibliography: references.bib
-references:
-- id: dummy
-  title: no title
-  author:
-  - family: noname
-    given: noname
 ---
 
 
@@ -34,18 +28,17 @@ This documents describes
 
 ## Prerequisites
 
-The analysis in this document requires an R version >= 3.5.0 and recent versions
+The analysis in this document requires an R version >= 3.6.0 and recent versions
 of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages available
-through Bioconductor version 3.8. The packages can be installed with:
+through Bioconductor version 3.9. The packages can be installed with:
 
 
-```{r  install-required, eval = FALSE, results = "hide" }
+```{r install-required, eval = FALSE, results = "hide" }
 #' Install the Bioconductor package manager
 install.packages("BiocManager")
 
 #' Install the required packages
-BiocManager::install(c("xcms", "MSnbase", "doParallel", "msdata",
-                       "magrittr"))
+BiocManager::install(c("xcms", "MSnbase", "msdata", "magrittr"))
 ```
 
 The
@@ -123,9 +116,7 @@ from the original files are not kept in memory, but retrieved from the original
 files on demand. This enables analyses of also very large experiments.
 
 ```{r load-data, message = FALSE, warning = FALSE}
-library(MSnbase)
 library(xcms)
-library(doParallel)
 library(magrittr)
 
 ## Define the file names.
@@ -147,8 +138,7 @@ and will use this setup by default.
 
 ```{r  parallel-setup, message = FALSE }
 ## Set up parallel processing using 2 cores
-registerDoParallel(2)
-register(bpstart(DoparParam()), default = TRUE) 
+register(bpstart(MulticoreParam()), default = TRUE) 
 ```
 
 The MS experiment data is now represented as an `OnDiskMSnExp` object. Phenotype
@@ -277,7 +267,10 @@ variable. This can be accessed in the same way than for `OnDiskMSnExp` objects
 
 ```{r  chromatogram-pdata, message = FALSE }
 ## Access the full phenotype data
-pData(chr) 
+pData(chr)
+
+## Access an individual column
+chr$injection_idx
 ```
 
 Depending on the parameter `aggregationFun`, the function can produce total ion
@@ -408,14 +401,14 @@ width of the peak in retention time dimension and depends thus on the LC setting
 of the LC-MS system used to measure the data. Appropriate values for this
 parameter can be defined based on extracted ion chromatograms of known
 compounds. Below we extract chromatographic data for Serine and perform a peak
-detection on the `Chromatogram` object using the default parameters for
+detection on the `Chromatograms` object using the default parameters for
 centWave.
 
 ```{r  centWave-default, message = FALSE, fig.cap = "XIC for Serine", results = "hide" }
-## Get the XIC for serine in the first file
+## Get the XIC for serine in all files
 srn_chr <- chromatogram(data_cent, rt = c(165, 200),
                         mz = c(106.03, 106.06),
-                        aggregationFun = "max")[1, 1]
+                        aggregationFun = "max")
 ## Plot the data
 par(mfrow = c(1, 1), mar = c(4, 4.5, 1, 1))
 plot(srn_chr)
@@ -424,12 +417,12 @@ plot(srn_chr)
 cwp <- CentWaveParam()
 
 ## "dry-run" peak detection on the XIC.
-findChromPeaks(srn_chr, param = cwp) 
+findChromPeaks(srn_chr, param = cwp)
 ```
 
-The warning message tells us that centWave failed to find any peak in the
-provided data. Looking at the default values for the centWave parameters helps
-understanding why the peak detection failed:
+Apparently we did not find any chromatographic peaks in the submitted data
+(shown by `"peaks: 0"` for all chromatograms). Looking at the default values for
+the centWave parameters helps understanding why the peak detection failed:
 
 ```{r  centWave-default-parameters, message = FALSE }
 cwp 
@@ -445,12 +438,23 @@ peak widths for several ions in the data set to determine the most appropriate
 ```{r  centWave-adapted, message = FALSE, fig.cap = "XIC for Serine with detected chromatographic peak", results = "hide" }
 cwp <- CentWaveParam(peakwidth = c(2, 10))
 
-pks <- findChromPeaks(srn_chr, param = cwp)
+srn_chr <- findChromPeaks(srn_chr, param = cwp)
 
 ## Plot the data and higlight identified peak area
 plot(srn_chr)
-rect(pks[, "rtmin"], 0, pks[, "rtmax"], pks[, "maxo"], border = "#00000040") 
 ```
+
+Note that the `srn_chr` object contains, after peak detection, also all
+identified chromatographic peaks. These can be accessed with the `chromPeaks`
+function:
+
+```{r chromPeaks-chromatogram}
+chromPeaks(srn_chr)
+```
+
+Columns `"column"` indicate in which sample the peak was identified,
+`"row"` would define in which EIC (i.e. m/z - retention time slice) the peak was
+detected. All the remaining columns characterize the identified peak.
 
 Another important parameter is `ppm` which is used in the initial identification
 of the regions of interest. In contrast to random noise, the *real* signal from
@@ -462,7 +466,7 @@ interest that is then subject for the CWT-based peak detection. To illustrate
 this, we plot the full data for Serine.
 
 ```{r  Serine-mz-scattering-plot, message = FALSE }
-## Restrict the data to signal from Sering
+## Restrict the data to signal from Serine
 srn <- data_cent %>%
     filterRt(rt = c(179, 186)) %>%
     filterMz(mz = c(106.04, 106.06))
@@ -510,16 +514,27 @@ chromPeaks(data_cent, mz = c(106, 107), rt = c(150, 190))
 ```
 
 For each identified peak the m/z and rt value of the apex is reported (columns
-"mz" and "rt") as well as their ranges ("mzmin", "mzmax", "rtmin", "rtmax"), the
-integrated signal of the peak (i.e. the peak area "into"), the maximal signal of
-the peak ("maxo"), the signal to noise ratio ("sn") and the index of the sample
-in which the peak was detected ("sample").  For quality assessment we could now
-calculate summary statistics on the identified peaks to e.g. identify samples
-with much less detected peaks. Also, we can use the `plotChromPeaks` function to
-provide some general information on the location of the identified
-chromatographic peaks in the m/z - rt space.
+`"mz"` and `"rt"`) as well as their ranges (`"mzmin"`, `"mzmax"`, `"rtmin"`, 
+`"rtmax"`), the integrated signal of the peak (i.e. the peak area `"into"`), 
+the maximal signal of the peak (`"maxo"`), the signal to noise ratio (`"sn"`) 
+and the index of the sample in which the peak was detected (`"sample"`).
 
-```{r  plotChromPeaks, message = FALSE, fig.cap = "Location of the identified chromatographic peaks in the m/z - rt space." }
+Note that **after** peak detection extracted ion chromatogram data will also
+contain identified chromatographic peaks. Below we extract the EIC for Serine
+and display the identified peaks for that compound.
+
+```{r chrom-after}
+eic_serine <- chromatogram(data_cent, mz = c(106.04, 106.06),
+                           rt = c(179, 186))
+chromPeaks(eic_serine)
+```
+
+For quality assessment we could now calculate summary statistics on the
+identified peaks to e.g. identify samples with much less detected peaks. Also,
+we can use the `plotChromPeaks` function to provide some general information on
+the location of the identified chromatographic peaks in the m/z - rt space.
+
+```{r plotChromPeaks, warning = FALSE, message = FALSE, fig.cap = "Location of the identified chromatographic peaks in the m/z - rt space." }
 par(mfrow = c(1, 2))
 plotChromPeaks(data_cent, 1)
 plotChromPeaks(data_cent, 2) 
@@ -532,12 +547,16 @@ While chromatography helps to discriminate between analytes it is also affected
 by variances that lead to shifts in retention times between measurement
 runs. The alignment step aims to adjust these retention time differences between
 samples in an experiment. Below we plot the base peak chromatograms of both
-files of our toy data set to visualize these differences.
+files of our toy data set to visualize these differences. Remember that calling
+`chromatogram` on an object **after** peak detection will always return also
+identified chromatographic peaks. Thus we use `peakType = "none"` in the
+plotting call below to skip highlighting of identified chromatographic peaks
+(which would otherwise create a rather busy plot).
 
 ```{r  alignment-bpc-raw, message = FALSE, fig.cap = "BPC of all files.", fig.width = 8, fig.height = 4 }
 ## Extract base peak chromatograms
 bpc_raw <- chromatogram(data_cent, aggregationFun = "max")
-plot(bpc_raw) 
+plot(bpc_raw, peakType = "none")
 ```
 
 While both samples were measured with the same setup on the same day there are
@@ -546,7 +565,12 @@ still differences observable in the BPCs above.
 Alignment can be performed with `xcms` using the `adjustRtime` function that
 supports the *peakGroups* [@Smith:2006ic] and the *obiwarp* [@Prince:2006jj]
 method. The settings for the algorithms can be defined with the
-`PeakGroupsParam` and the `ObiwarpParam` parameter objects, respectively.
+`PeakGroupsParam` and the `ObiwarpParam` parameter objects, respectively. Note
+also that `xcms` supports now a *subset-based* alignment which would allow to
+align a whole data set based on retention time shift adjustments estimated on
+e.g. QC samples. See the `xcms`
+[vignette](https://bioconductor.org/packages/release/bioc/vignettes/xcms/inst/doc/xcms.html)
+for more information.
 
 For our example we use the peakGroups method that aligns samples based on the
 retention times of *hook peaks*, which are supposed to be present in most
@@ -600,9 +624,9 @@ get a general overview of the alignment performance.
 ```{r  bpc-raw-adjusted, message = FALSE, fig.cap = "BPC before (top) and after (bottom) alignment.", fig.width = 10, fig.height = 8 }
 par(mfrow = c(2, 1))
 ## Plot the raw base peak chromatogram
-plot(bpc_raw)
+plot(bpc_raw, peakType = "none")
 ## Plot the BPC after alignment
-plot(chromatogram(data_cent, aggregationFun = "max")) 
+plot(chromatogram(data_cent, aggregationFun = "max"), peakType = "none")
 ```
 
 The base peak chromatograms are nicely aligned after retention time
@@ -645,18 +669,15 @@ allows to test different settings for the correspondence on data subsets before
 applying them on the full data set.
 
 ```{r  correspondence-example, message = FALSE, results = "hide", fig.cap = "BPC for a m/z slice and defined features within this slice based on default settings." }
-## Plot the BPC for the m/z slice containing serine
-par(mfrow = c(2, 1), mar = c(4, 4.3, 1, 0.5))
-plot(chromatogram(data_cent, mz = c(106.04, 106.06), aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = c(106.04, 106.06),
-                    whichPeaks = "apex_within")
-
 ## Get default parameters for the grouping
 pdp <- PeakDensityParam(sampleGroups = data_cent$group)
 
+## Extract a BPC for the m/z slice containing serine
+bpc_serine <- chromatogram(data_cent, mz = c(106.04, 106.06),
+                           aggregationFun = "max")
+
 ## Dry-run correspondence and show the results.
-plotChromPeakDensity(data_cent, mz = c(106.04, 106.06),
-                     type = "apex_within", param = pdp)
+plotChromPeakDensity(bpc_serine, param = pdp)
  
 ```
 
@@ -685,13 +706,12 @@ complicated, signals. We thus evaluate the performance of the default parameters
 on an m/z slice that contains also the isomers Betaine and Valine ([M+H]+ m/z
 118.08625).
 
-```{r  correspondence-bw, message = FALSE, fig.cap = "Define correspondence settings to separate Betaine and Valine peaks.", fig.width = 10, fig.height = 10 }
+```{r  correspondence-bw, warning = FALSE, message = FALSE, fig.cap = "Define correspondence settings to separate Betaine and Valine peaks.", fig.width = 10, fig.height = 10 }
 par(mfrow = c(3, 1), mar = c(3, 4.3, 1, 1))
 
 ## Plot the chromatogram for an m/z slice containing Betaine and Valine
 mzr <- 118.08625 + c(-0.01, 0.01)
 plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
 
 ## Correspondence in that slice using default settings
 pdp <- PeakDensityParam(sampleGroups = data_cent$group)
@@ -722,15 +742,10 @@ Leucine and Isoleucine ([M+H]+ m/z 132.10191). Setting `simulate = FALSE` in
 analysis.
 
 ```{r  correspondence-evaluate, message = FALSE, fig.cap = "Result of correspondence on a slice containing the isomers Leucine and Isoleucine.", fig.width = 10, fig.heigt = 8 }
-par(mfrow = c(2, 1), mar = c(3, 4.3, 1, 1))
-
-## Plot the chromatogram for an m/z slice containing Leucine and Isoleucine
+## Plot the results for an m/z slice containing Leucine and Isoleucine
 mzr <- 132.10191 + c(-0.01, 0.01)
-plot(chromatogram(data_cent, mz = mzr, aggregationFun = "max"))
-highlightChromPeaks(data_cent, mz = mzr, whichPeaks = "apex_within")
-
-plotChromPeakDensity(data_cent, mz = mzr, param = pdp, type = "apex_within",
-                     simulate = FALSE) 
+chr <- chromatogram(data_cent, mz = mzr, aggregationFun = "max")
+plotChromPeakDensity(chr, simulate = FALSE)
 ```
 
 Despite being very close, peaks of isomers were successfully grouped into
@@ -743,6 +758,10 @@ feature and their respective indices in the `chromPeaks` matrix.
 ## Definition of the features
 featureDefinitions(data_cent) 
 ```
+
+Note that the EIC `chr` above would also contain the correspondence results for
+the selected m/z range which could also be accessed with
+`featureDefinitions(chr)`.
 
 Also, we can calculate simple per-feature summary statistic with the
 `featureSummary` function. This function reports for each feature the total
@@ -840,8 +859,8 @@ processParam(processHistory(data_cent)[[1]])
 - The new data objects and functions are aimed to simplify data access and
   inspection of results and should facilitate data set-dependent definition of
   algorithm parameters.
-- More work to come for the analysis of chromatographic data (SRM/MRM) and
-  eventually for data normalization.
+- More work to come for the analysis of chromatographic data (SRM/MRM), support
+  for MSn data sets (DDA, DIA) and eventually for data normalization.
 
 # Session information
 

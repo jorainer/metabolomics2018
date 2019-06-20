@@ -1,5 +1,3 @@
-Note: this branch illustrates and compares the usage of the new hdf5-file-based
-`Hdf5MSnExp` object from `MSnbase`.
 
 # metabolomics2018
 
