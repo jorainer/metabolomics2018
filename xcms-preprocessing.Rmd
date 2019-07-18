@@ -4,7 +4,7 @@ author:
 - name: "Johannes Rainer"
   affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github: jorainer twitter: jo_rainer"
 graphics: yes
-date: "24 June 2018; updated June 20 2019"
+date: "24 June 2018; updated July 18 2019"
 output:
   BiocStyle::html_document:
     number_sections: true
@@ -140,6 +140,13 @@ and will use this setup by default.
 ## Set up parallel processing using 2 cores
 register(bpstart(MulticoreParam()), default = TRUE) 
 ```
+
+```{r disable-parallel, echo = FALSE}
+## Disable parallel processing for rendering - there seems to be an
+## issue with macOS beta and parallel processing.
+register(SerialParam())
+```
+
 
 The MS experiment data is now represented as an `OnDiskMSnExp` object. Phenotype
 information can be retrieved with the `pData` function, or directly using
