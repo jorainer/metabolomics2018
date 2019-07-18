@@ -475,13 +475,30 @@ srn <- data_cent %>%
 plot(srn, type = "XIC") 
 ```
 
-As expected, higher intensity signals tend to scatter less in m/z dimension. We
-next calculate the differences in m/z values between consecutive scans in this
-data subset.
+As expected, higher intensity signals tend to scatter less in m/z dimension.
+
+Below we identify the sample with the highest signal (sum of all intensities)
+for the selected m/z - rt range. We thus first extract the intensities for all
+spectra and split these by file. Then we sum all intensities reported for a
+file.
+
+```{r sample-highest-signal}
+## Extract intensities and split them by file. This will return
+## a list of lists.
+ints_per_file <- split(intensity(srn), fromFile(srn))
+
+## For each file, sum up the intensities.
+ints_sum <- lapply(ints_per_file, function(x) sum(unlist(x)))
+ints_sum
+```
+
+We next calculate the differences in m/z values between consecutive scans in
+this data subset. We do this for one *representative* file, selecting the one
+with the highest total sum of intensities in the selected region.
 
 ```{r  define-ppm, message = FALSE }
 ## Extract the Serine data for one file as a data.frame
-srn_df <- as(filterFile(srn, 1), "data.frame")
+srn_df <- as(filterFile(srn, file = which.max(ints_sum)), "data.frame")
 
 ## The difference between m/z values from consecutive scans expressed
 ## in ppm
