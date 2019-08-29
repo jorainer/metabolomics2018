@@ -1,15 +1,16 @@
+*2019-09-29*: More updates and expansion of descriptions.
 *2019-06-20*: Updated to match `xcms` functionality available with Bioconductor
 version 3.9.
 
-# metabolomics2018
+# LC-MS data pre-processing with `xcms`
 
-Workshop material for the xcms (version >= 3) workshop at the Metabolomics
-Society conference 2018 in Seattle (http://metabolomics2018.org). The workshop
-provides an overview of recent developments in Bioconductor to work with mass
-spectrometry ([MSnbase](https://github.com/lgatto/MSnbase)) and specifically
-LC-MS data ([xcms](https://github.com/sneumann/xcms)) and walks through the
-preprocessing of a toy data set emphasizing on selection of data-dependent
-settings for the individual pre-processing steps.
+This workshop provides an overview of recent developments in Bioconductor to
+work with mass spectrometry ([MSnbase](https://github.com/lgatto/MSnbase)) and
+specifically LC-MS data ([xcms](https://github.com/sneumann/xcms)) and walks
+through the preprocessing of a toy data set emphasizing on selection of
+data-dependent settings for the individual pre-processing steps. The present
+workshop represents an updated version of the workshop given at the Metabolomics
+Society conference 2018 in Seattle (http://metabolomics2018.org).
 
 Covered topics are:
 - Data import and representation.
@@ -34,14 +35,18 @@ presentation online [xcms-preprocessing-ioslides.html](https://jorainer.github.i
 
 ## Prerequisites
 
-The analysis in this document requires an R version >= 3.5.0 and recent versions
+The analysis in this document requires an R version >= 3.6.0 and recent versions
 of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages. The code
 below installs all packages for the analysis.
 
-```
+```r
 install("BiocManager")
-BiocManager::install(c("xcms", "MSnbase", "doParallel", "msdata", 
-    "magrittr", "devtools"))
+BiocManager::install(c("xcms",
+                       "MSnbase",
+                       "msdata",
+                       "magrittr",
+                       "devtools",
+                       "BiocParallel"))
 ```
 
 
@@ -55,10 +60,10 @@ BiocManager::install(c("xcms", "MSnbase", "doParallel", "msdata",
   markdown file that is rendered (with
   `rmarkdown::render("xcms-preprocessing-ioslides.Rmd")` into the html
   (ioslides-based) presentation for the conference. This file contains most of
-  the R commands from `xcms-preprocessing.Rmd` but only few descriptions.
+  the R commands from `xcms-preprocessing.Rmd` but only few descriptions. (outdated!)
 
 - [xcms-preprocessing-bullets.Rmd](./xcms-preprocessing-bullets.Rmd): file with
   complete R code but strongly reduced descriptive content (in form of bullet
   points). This file is thought to be used for an interactive presentation with
-  RStudio (i.e. live execution of commands).
+  RStudio (i.e. live execution of commands). (outdated!)
   
