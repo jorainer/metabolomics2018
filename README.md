@@ -1,6 +1,6 @@
-*2019-09-29*: More updates and expansion of descriptions.
-*2019-06-20*: Updated to match `xcms` functionality available with Bioconductor
-version 3.9.
+- *2019-09-29*: More updates and expansion of descriptions.
+- *2019-06-20*: Updated to match `xcms` functionality available with
+Bioconductor version 3.9.
 
 # LC-MS data pre-processing with `xcms`
 
