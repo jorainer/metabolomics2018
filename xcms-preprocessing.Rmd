@@ -4,7 +4,7 @@ author:
 - name: "Johannes Rainer"
   affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github: jorainer twitter: jo_rainer"
 graphics: yes
-date: "24 June 2018; updated August 29 2019"
+date: "24 June 2018; updated February 04 2020"
 output:
   BiocStyle::html_document:
     number_sections: true
