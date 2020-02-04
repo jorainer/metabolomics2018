@@ -495,10 +495,13 @@ above it is apparent that the chromatographic peak for Serine is about 4 seconds
 wide. Below we adapt the settings to accommodate peaks ranging from 2 to 10
 seconds and re-run the peak detection. In general, it is advised to investigate
 peak widths for several ions in the data set to determine the most appropriate
-`peakwidth` setting.
+`peakwidth` setting. Note that we use also `integrate = 2` which uses a
+different way to define the peak borders that can (as in the present case)
+result in better peak boundary estimates (try with the default `integrate = 1`
+to compare the difference).
 
 ```{r centWave-adapted, fig.cap = "XIC for Serine with detected chromatographic peak", results = "hide"}
-cwp <- CentWaveParam(peakwidth = c(2, 10))
+cwp <- CentWaveParam(peakwidth = c(2, 10), integrate = 2)
 
 srn_chr <- findChromPeaks(srn_chr, param = cwp)
 
@@ -578,7 +581,7 @@ the `ppm` and `peakwidth` parameters.
 
 ```{r findPeaks-centWave}
 #' Perform peak detection
-cwp <- CentWaveParam(peakwidth = c(2, 10), ppm = 30)
+cwp <- CentWaveParam(peakwidth = c(2, 10), ppm = 30, integrate = 2)
 data_cent <- findChromPeaks(data_cent, param = cwp) 
 ```
 
@@ -611,6 +614,49 @@ eic_serine <- chromatogram(data_cent, mz = c(106.04, 106.06),
 chromPeaks(eic_serine)
 ```
 
+Peak detection will not always work perfectly leading to peak detection
+artifacts, such as overlapping peaks or artificially split peaks. The
+`refineChromPeaks` function allows to *refine* peak detection results by either
+or removing identified peaks exceeding a maximal allower rt width or by merging
+artificially split chromatographic peaks. For the former a `CleanPeaksParam`
+parameter object can be submitted to the function while the latter can be
+configured with the `MergeNeighboringPeaksParam` object. Below we post-process
+the peak detection results merging peaks overlapping in a 4 second window per
+file if the signal between in between them is lower than 75% of the smaller
+peak's maximal intensity. See the `MergeNeighboringPeaksParam` help page for a
+detailed description of the settings and the approach.
+
+```{r}
+mpp <- MergeNeighboringPeaksParam(expandRt = 4)
+data_cent_pp <- refineChromPeaks(data_cent, param = mpp)
+```
+
+Merged peaks can be identified with a `TRUE` in the `"merged"` chromatographic
+peak metadata column (see below).
+
+```{r}
+chromPeakData(data_cent_pp)
+```
+
+An example for a joined (merged) peak is given below
+
+```{r merged-peak, fig.width = 12, fig.height = 6, fig.cap = "Result from the peak refinement. Left: peaks before merging, right after merging."}
+mzr <- c(124.084, 124.088)
+rtr <- c(150, 170)
+chr_1 <- chromatogram(filterFile(data_cent, 2), mz = mzr, rt = rtr)
+chr_2 <- chromatogram(filterFile(data_cent_pp, 2), mz = mzr, rt = rtr)
+par(mfrow = c(1, 2))
+plot(chr_1)
+plot(chr_2)
+```
+
+At last we replace the `data_cent` variable with the object containing also the
+peak refinement results.
+
+```{r}
+data_cent <- data_cent_pp
+```
+
 For quality assessment we could now calculate summary statistics on the
 identified peaks to e.g. identify samples with much less detected peaks. Also,
 we can use the `plotChromPeaks` function to provide some general information on
@@ -621,6 +667,7 @@ par(mfrow = c(1, 2))
 plotChromPeaks(data_cent, 1)
 plotChromPeaks(data_cent, 2) 
 ```
+
 
 
 ### Alignment
@@ -864,13 +911,16 @@ head(featureSummary(data_cent))
 
 The final result from the LC-MS data preprocessing is a matrix with feature
 abundances, rows being features, columns samples. Such a matrix can be extracted
-with the `featureValues` function from the result object. The function takes two
-additional parameters `value` and `method`: `value` defines the column in the
-`chromPeaks` table that should be reported in the matrix, and `method` the
-approach to handle cases in which more than one peak in a sample is assigned to
-the feature. Below we set `value = "into"` (the default) to extract the total
-integrated peak area and `method = "maxint"` to report the peak area of the peak
-with the largest intensity for features with multiple peaks in a sample.
+with the `featureValues` function from the result object (see further below for
+an alternative, preferred way to extract preprocessing results with the
+`quantify` method). The function takes two additional parameters `value` and
+`method`: `value` defines the column in the `chromPeaks` table that should be
+reported in the matrix, and `method` the approach to handle cases in which more
+than one peak in a sample is assigned to the feature. 
+
+Below we set `value = "into"` (the default) to extract the total integrated peak
+area and `method = "maxint"` to report the peak area of the peak with the
+largest intensity for features with multiple peaks in a sample.
 
 ```{r correspondence-featureValue}
 #' feature intensity matrix
@@ -925,6 +975,62 @@ The data analysis would now continue with the feature matrix and could comprise
 normalization of the abundances, identification of the compounds and
 differential abundance analysis.
 
+Note also that, in addition to the `featureValues` method that simply extracts
+the feature matrix, the pre-processing results can also be converted to a
+`SummarizedExperiment` that, besides containing the feature quantification,
+stores also the pheno data (sample descriptions) and feature
+definitions. Below we use the `quantify` method to extract the pre-processing
+results as a `SummarizedExperiment`. The function takes any parameter of the
+`featureValues` function as additional arguments, thus, with the call below we
+extract only integrated signal from detected peaks and sum up the signals of all
+chromatographic peaks assigned to a feature in a sample.
+
+```{r}
+library(SummarizedExperiment)
+res <- quantify(data_cent, filled = FALSE, method = "sum", value = "into")
+```
+
+The `SummarizedExperiment` is the main data object in Bioconductor to store
+quantified omics data and hence an ideal container for the LC-MS data
+pre-processing results. The column annotations can be accessed with `colData`,
+the feature definitions (row annotations) with `rowData`:
+
+```{r}
+colData(res)
+```
+
+```{r}
+rowData(res)
+```
+
+The quantified feature abundances can be accessed with the `assay` method
+providing with the second argument the name of the assay matrix to extract:
+
+```{r}
+head(assay(res, "raw"))
+```
+
+The `SummarizedExperiment` supports several such assay matrices (as long as they
+have the same dimensions). We can thus add for example the feature
+quantification including also the filled-in signal as an additional assay
+matrix:
+
+```{r}
+assays(res)$raw_filled <- featureValues(data_cent, method = "sum",
+                                        value = "into", filled = TRUE)
+```
+
+With that we have now two assay matrices in our result object:
+
+```{r}
+assayNames(res)
+```
+
+Analogously we could add normalized data to this object or any other processed
+values. The advantage of having all the data within one object is obvious: any
+subsetting of the data ensures that all assays and annotations are subsetted
+correctly.
+
 One final thing worth mentioning is that `XCMSnExp` objects keep, next to the
 preprocessing results, also a history of all processing steps and all parameter
 objects used during the analysis. The process history can be accessed with the
@@ -942,6 +1048,12 @@ The parameter object for one analysis step can be accessed with `processParam`:
 processParam(processHistory(data_cent)[[1]])
 ```
 
+All this information is also stored in the `metadata` slot of the
+`SummarizedExperiment`:
+
+```{r}
+metadata(res)
+```
 
 # Summary
 
@@ -959,7 +1071,7 @@ particular how to adapt peak detection setting on a rather noisy
 *chromatographic* data. Below we load the example data from a text file.
 
 ```{r peaks-load}
-data <- read.table("data/Chromatogram.txt", sep = "\t", header = TRUE)
+data <- read.table("data/chromatogram.txt", sep = "\t", header = TRUE)
 head(data)
 ```
 

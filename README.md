@@ -1,3 +1,6 @@
+- *2020-02-04*: add `refineChromPeaks` to allow *refinement* of peak detection
+  results. Also, add the `quantify` method to extract the preprocessing results
+  as `SummarizedExperiment`. Both required `xcms` version >= 2.9.2.
 - *2019-09-29*: More updates and expansion of descriptions.
 - *2019-06-20*: Updated to match `xcms` functionality available with
 Bioconductor version 3.9.
