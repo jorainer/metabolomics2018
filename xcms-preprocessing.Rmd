@@ -4,7 +4,7 @@ author:
 - name: "Johannes Rainer"
   affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github: jorainer twitter: jo_rainer"
 graphics: yes
-date: "24 June 2018; updated February 04 2020"
+date: "24 June 2018; updated June 15 2020"
 output:
   BiocStyle::html_document:
     number_sections: true
@@ -50,10 +50,9 @@ may jump directly to the next section.
 
 ## Prerequisites
 
-The analysis in this document requires an R version >= 3.6.0 and recent versions
-of the `MSnbase` and `xcms` (version >= 3.3.1 is needed) packages available
-through Bioconductor version 3.9. The packages can be installed with:
-
+The analysis in this document requires an R version >= 4.0.0 and recent versions
+of the `MSnbase` and `xcms` (version >= 3.11.3 is needed) packages. The packages
+can be installed with:
 
 ```{r install-required, eval = FALSE}
 #' Install the Bioconductor package manager
@@ -65,6 +64,17 @@ BiocManager::install(c("xcms",
                        "msdata",
                        "magrittr",
                        "png"))
+```
+
+Because `xcms` version 3.11.3 is a developmental version we might have to
+install it from github if the required version was not installed with the
+previous command.
+
+```{r check-xcms, message = FALSE, warning = FALSE}
+if (!packageVersion("xcms") >= "3.11.3") {
+    Sys.setenv(R_REMOTES_NO_ERRORS_FROM_WARNINGS="true")
+    devtools::install_github("sneumann/xcms")
+}
 ```
 
 The
@@ -480,7 +490,8 @@ plot(srn_chr)
 cwp <- CentWaveParam()
 
 #' "dry-run" peak detection on the XIC.
-findChromPeaks(srn_chr, param = cwp)
+res <- findChromPeaks(srn_chr, param = cwp)
+chromPeaks(res)
 ```
 
 No peaks were identified by the call above. Looking at the default values for
@@ -612,6 +623,24 @@ and display the identified peaks for that compound.
 eic_serine <- chromatogram(data_cent, mz = c(106.04, 106.06),
                            rt = c(179, 186))
 chromPeaks(eic_serine)
+```
+
+And plotting this extracted ion chromatogram will also show the identified
+chromatographic peaks.
+
+```{r plot-after}
+plot(eic_serine)
+```
+
+A plot of type `"XIC"` **after** peak detection will also indicate the rt-m/z
+region from which signal is integrated (the red rectangle in the plot below).
+
+```{r xic-after}
+srn <- data_cent %>%
+    filterRt(rt = c(175, 188)) %>%
+    filterMz(mz = c(106.04, 106.06))
+
+plot(srn, type = "XIC")
 ```
 
 Peak detection will not always work perfectly leading to peak detection
@@ -748,14 +777,19 @@ The difference between raw and adjusted retention time should be reasonable. In
 our example it is mostly below one second, which is OK since the samples were
 measured within a short time period and differences are thus expected to be
 small. Also, hook peaks should ideally be present along the full retention time
-range. Next we plot the base peak chromatograms before and after alignment.
+range. Next we plot the base peak chromatograms before and after alignment. Note
+that a `chromatogram` call will always include all detected chromatographic
+peaks in the requested rt range but for a base peak chromatogram we don't need
+this information. With `include = "none"` in the `chromatogram` call we tell the
+function to **not** include any identified chromatographic peaks in the
+returned chromatographic data. 
 
 ```{r bpc-raw-adjusted, fig.cap = "BPC before (top) and after (bottom) alignment.", fig.width = 10, fig.height = 8}
 par(mfrow = c(2, 1))
 #' Plot the raw base peak chromatogram
 plot(bpc_raw, peakType = "none")
 #' Plot the BPC after alignment
-plot(chromatogram(data_cent, aggregationFun = "max"), peakType = "none")
+plot(chromatogram(data_cent, aggregationFun = "max", include = "none"))
 ```
 
 The base peak chromatograms are nicely aligned after retention time
@@ -936,28 +970,22 @@ in the respective sample. One possibility to deal with such missing values is
 data imputation. With the `fillChromPeaks` function, `xcms` provides however an
 alternative approach that integrates the signal measured at the m/z - retention
 time region of the feature in the original files of samples for which an `NA`
-was reported hence *filling-in* missing peak data. The region from which signal
-is recovered is defined by the columns `"mzmin"`, `"mzmax"`, `"rtmin"` and
-`"rtmax"` in the `featureDefinitions` data frame, which represent the minimal
-and maximal positions of the apexes of all chromatographic peaks assigned to the
-feature. Because only peak apex positions are considered, this region might not
-be representative of the actual chromatographic peaks. The feature region can
-however be increased in m/z and/or retention time retention: parameter `fixedRt`
-enables for example the expansion of the feature area in retention time
-dimension by a constant value. In the example below we fill-in missing peak data
-expanding the feature region by the median width of all chromatographic peaks
-in the data.
+was reported hence *filling-in* missing peak data. Two different approaches are
+available to define the m/z - retention time region from which signal should be
+integrated: `ChromPeakAreaParam` defines the region based on the m/z and rt
+range of the identified chromatographic peaks of the feature and
+`FillChromPeaksParam` uses columns `"mzmin"`, `"mzmax"`, `"rtmin"` and `"rtmax"`
+in the `featureDefinitions` data frame. While the `FillChromPeaksParam`
+resembles the peak filling-in of the *original* `xcms` implementation, it is
+suggested to use the `ChromPeakAreaParam` approach instead.
+
+Below we perform the gap-filling with the `ChromPeakAreaParam` approach.
 
 ```{r fillChromPeaks}
 #' Number of missing values
 sum(is.na(fmat))
 
-#' Determine the median retention time width of detected peaks
-rt_med <- median(chromPeaks(data_cent)[, "rtmax"] -
-                 chromPeaks(data_cent)[, "rtmin"])
-
-fpp <- FillChromPeaksParam(fixedRt = rt_med / 2)
-data_cent <- fillChromPeaks(data_cent, param = fpp)
+data_cent <- fillChromPeaks(data_cent, param = ChromPeakAreaParam())
 
 #' How many missing values after
 sum(is.na(featureValues(data_cent)))
@@ -966,7 +994,7 @@ fmat_fld <- featureValues(data_cent, value = "into", method = "maxint")
 head(fmat_fld) 
 ```
 
-With `fillChromPeaks` we could *rescue* signal for all but 14 features with
+With `fillChromPeaks` we could *rescue* signal for all but 23 features with
 missing values. Note that filled-in peak information can also be removed any
 time with the `dropFilledChromPeaks` function. Also, setting `filled = FALSE` in
 the `featureValues` function would return only data from detected peaks.
