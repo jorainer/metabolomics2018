@@ -3,6 +3,8 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3909299.svg)](https://doi.org/10.5281/zenodo.3909299)
 
 
+- *2020-06-15*: use new more data-driven gap-filling approach: `fillChromPeaks`
+  with `ChromPeakAreaParam`.
 - *2020-02-04*: add `refineChromPeaks` to allow *refinement* of peak detection
   results. Also, add the `quantify` method to extract the preprocessing results
   as `SummarizedExperiment`. Both required `xcms` version >= 2.9.2.
