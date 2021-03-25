@@ -4,7 +4,7 @@ author:
 - name: "Johannes Rainer"
   affiliation: "Eurac Research, Bolzano, Italy; johannes.rainer@eurac.edu github: jorainer twitter: jo_rainer"
 graphics: yes
-date: "24 June 2018; updated June 15 2020"
+date: "24 June 2018; updated March 25 2021"
 output:
   BiocStyle::html_document:
     number_sections: true
@@ -174,6 +174,16 @@ data <- readMSData(fls, pdata = new("NAnnotatedDataFrame", pd),
                    mode = "onDisk") 
 ```
 
+Note that for a *real* experiment it is suggested to define such a *phenodata*
+table as an e.g. tab delimited text file (or an xls sheet) that contains all of
+the raw data file names along with all the relevant sample information for each
+file as additional columns. Such a data table could then be imported into R
+using e.g. `read.table` and the file names could be specified for `readMSData`
+with `files = paste0(MZML_PATH, "/", pd$mzML_file)` where `MZML_PATH` would be
+the directory containing the data (mzML) files, `pd` would be the imported
+phenodata table that contains in a column named `"mzML_file"` the names of the
+individual raw files.
+
 Next we set up parallel processing. This ensures that all required cores are
 registered and available from the beginning of the analysis. All data access and
 analysis functions of `xcms` and `MSnbase` are parallelized on a per-file basis
@@ -251,7 +261,8 @@ the pipe operator `%>%` from the `magrittr` package for better readability.
 #' Use %>% to avoid nested function calls
 sps <- data %>%
     filterRt(rt = c(180, 181)) %>%
-    spectra 
+    spectra
+
 ```
 
 The result is a `list` of `Spectrum` objects. Below we determine the number of
@@ -259,7 +270,7 @@ spectra we have got.
 
 ```{r spectra-filterRt-length}
 #' How many spectra?
-length(sps) 
+length(sps)
 ```
 
 We can use the `fromFile` function to determine from which file/sample each
@@ -267,7 +278,7 @@ spectrum is.
 
 ```{r spectra-filterRt-fromFile}
 #' From which file?
-sapply(sps, fromFile) 
+vapply(sps, fromFile, integer(1)) 
 ```
 
 We have thus 3 spectra per file. Next we plot the data from the last spectrum
@@ -308,7 +319,7 @@ chr <- chromatogram(data)
 chr
 
 #' Plot the tic
-plot(chr) 
+plot(chr)
 ```
 
 The object returned by the `chromatogram` function arranges the individual

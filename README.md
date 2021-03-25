@@ -3,6 +3,9 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3909299.svg)](https://doi.org/10.5281/zenodo.3909299)
 
 
+- *2021-03-25*: provide a description on the *good practice* to define a
+  phenodata/data files table containing also the names of the raw data files
+  along with all sample information.
 - *2020-06-15*: use new more data-driven gap-filling approach: `fillChromPeaks`
   with `ChromPeakAreaParam`.
 - *2020-02-04*: add `refineChromPeaks` to allow *refinement* of peak detection
