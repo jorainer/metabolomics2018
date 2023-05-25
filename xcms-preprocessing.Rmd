@@ -1365,7 +1365,7 @@ peak colored green).
 # Session information
 
 ```{r}
-sessionInformation()
+sessionInfo()
 ```
 
 
